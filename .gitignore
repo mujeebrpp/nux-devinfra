@@ -1,0 +1,12 @@
+.env
+.env.local
+.env.*.local
+
+# Local Docker data
+postgres/data/
+pgadmin/data/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
