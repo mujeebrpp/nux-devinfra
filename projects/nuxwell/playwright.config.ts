@@ -1,0 +1,1 @@
+import {defineConfig} from "@playwright/test"; export default defineConfig({testDir:"tests",use:{baseURL:"http://localhost:3090"},webServer:{command:"npm --prefix apps/web run dev",url:"http://localhost:3090",reuseExistingServer:true}});
