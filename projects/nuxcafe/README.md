@@ -24,6 +24,10 @@ npm run db:seed
 npm run dev
 ```
 
+For a one-shot reset of both databases (recreate migrations,
+generate the Prisma client, seed `nuxcafe_dev`, migrate
+`nuxcafe_test`), run `./db-setup.ps1`.
+
 Then open http://localhost:3094. The API health check is at
 http://localhost:3095/api/health.
 
@@ -42,7 +46,10 @@ apps/web/                  Next.js dashboard
   app/                     Home + /dashboard/* pages
   components/dashboard/    Client forms and action buttons
   lib/api/                 Typed API client (zod-validated)
-tests/smoke.spec.ts        Playwright smoke tests (all pages)
+tests/smoke.spec.ts        Playwright smoke tests (13 tests:
+                            every dashboard page renders +
+                            seeded data checks)
+db-setup.ps1               One-shot dev + test database reset
 ```
 
 ## Environment
@@ -60,8 +67,8 @@ Both files point at the shared Docker PostgreSQL on port 5433
 ## Testing
 
 ```powershell
-npm test          # Jest: unit specs + in-process API e2e specs
-npm run test:e2e  # Playwright: boots API + web, smoke tests pages
+npm test          # Jest: 9 suites, 46 tests (unit + in-process API e2e)
+npm run test:e2e  # Playwright: 13 smoke tests (boots API + web)
 ```
 
 The Jest global setup (`apps/api/test/global-setup.js`) enforces a

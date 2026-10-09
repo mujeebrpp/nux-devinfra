@@ -88,6 +88,15 @@ From the project root, `npm run dev` starts both with `concurrently`.
 postgresql://postgres:YOUR_PASSWORD@localhost:PORT/nuxcafe_dev
 ```
 
+NuxCafe runs as two local apps:
+
+| App | Port | Start |
+|---|---:|---|
+| Web (Next.js) | 3094 | `npm --prefix projects/nuxcafe/apps/web run dev` |
+| API (NestJS) | 3095 | `npm --prefix projects/nuxcafe/apps/api run start:dev` |
+
+From the project root, `npm run dev` starts both with `concurrently`.
+
 For automated tests, use the matching `*_test` database.
 
 ## Mailpit

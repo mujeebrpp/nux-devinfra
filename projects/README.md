@@ -58,6 +58,8 @@ scripts/
 
 ## Project status
 
-- **NuxWell** — implemented in this repository; see `projects/nuxwell/README.md` for the local setup and test instructions.
-- **NuxFarm** — placeholder scaffold only; not yet implemented.
-- **NuxCafe** — placeholder scaffold only; can adopt this contract when its GitHub repository is created.
+- **NuxWell** — implemented; see `projects/nuxwell/README.md` for the local setup and test instructions.
+- **NuxFarm** — implemented (multi-location farms, grow cycles, tasks, irrigation, inventory, reports) in `projects/nuxfarm`.
+- **NuxCafe** — implemented (menu, recipes, pantry stock, kitchen production, orders, sales); see `projects/nuxcafe/README.md` for the local setup and test instructions.
+
+All three projects are committed locally in this repository. The per-project GitHub repositories have not been created yet.
