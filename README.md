@@ -73,6 +73,15 @@ postgresql://postgres:YOUR_PASSWORD@localhost:PORT/nuxwell_dev
 postgresql://postgres:YOUR_PASSWORD@localhost:PORT/nuxfarm_dev
 ```
 
+NuxFarm runs as two local apps:
+
+| App | Port | Start |
+|---|---:|---|
+| Web (Next.js) | 3092 | `npm --prefix projects/nuxfarm/apps/web run dev` |
+| API (NestJS) | 3093 | `npm --prefix projects/nuxfarm/apps/api run start:dev` |
+
+From the project root, `npm run dev` starts both with `concurrently`.
+
 ### NuxCafe
 
 ```

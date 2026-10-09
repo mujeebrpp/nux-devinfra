@@ -37,6 +37,11 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+*.log
+
+# Local scratch artifacts
+tsc-errors.txt
+post-body.json
 
 # OS / editor
 .DS_Store
