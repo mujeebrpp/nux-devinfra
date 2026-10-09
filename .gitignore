@@ -25,6 +25,10 @@ test-results/
 playwright-report/
 coverage/
 
+# Generated smoke-check artifacts (see projects/nuxwell/check-systems-headed.mjs)
+shot-*.png
+system-check-report.json
+
 # Local agent tooling
 .kilo/
 
