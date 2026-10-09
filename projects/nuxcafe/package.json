@@ -1,1 +1,28 @@
-{"name":"nuxcafe-dev","private":true,"scripts":{"dev":"concurrently \"npm:dev:web\" \"npm:dev:api\"","dev:web":"npm --prefix apps/web run dev","dev:api":"npm --prefix apps/api run start:dev","test":"npm --prefix apps/web run test && npm --prefix apps/api run test","db:generate":"npm --prefix apps/api run prisma:generate","db:migrate":"npm --prefix apps/api run prisma:migrate"},"devDependencies":{"concurrently":"^9.1.2"}}
+{
+  "name": "nuxcafe-dev",
+  "version": "0.1.0",
+  "private": true,
+  "description": "NuxCafe — cafe operations platform (NestJS API + Next.js dashboard)",
+  "scripts": {
+    "dev": "concurrently \"npm:dev:web\" \"npm:dev:api\"",
+    "dev:web": "npm --prefix apps/web run dev",
+    "dev:api": "npm --prefix apps/api run start:dev",
+    "build": "npm --prefix apps/api run build && npm --prefix apps/web run build",
+    "build:api": "npm --prefix apps/api run build",
+    "build:web": "npm --prefix apps/web run build",
+    "start:api": "npm --prefix apps/api run start:prod",
+    "start:web": "npm --prefix apps/web run start",
+    "test": "npm --prefix apps/api run test",
+    "test:e2e": "playwright test",
+    "lint": "npm --prefix apps/api run lint && npm --prefix apps/web run lint",
+    "format": "npm --prefix apps/api run format && npm --prefix apps/web run format",
+    "db:generate": "npm --prefix apps/api run prisma:generate",
+    "db:migrate": "npm --prefix apps/api run prisma:migrate",
+    "db:migrate:deploy": "npm --prefix apps/api run prisma:migrate:deploy",
+    "db:seed": "npm --prefix apps/api run prisma:seed",
+    "db:reset": "npm --prefix apps/api run prisma:reset"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

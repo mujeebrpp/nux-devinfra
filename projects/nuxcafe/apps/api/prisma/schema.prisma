@@ -7,7 +7,190 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model HealthCheck {
-  id        Int      @id @default(autoincrement())
-  createdAt DateTime @default(now())
+enum IngredientUnit {
+  G
+  KG
+  ML
+  L
+  PCS
 }
+
+enum MenuItemCategory {
+  COFFEE
+  TEA
+  PASTRY
+  FOOD
+  OTHER
+}
+
+enum StockMovementType {
+  PURCHASE
+  USAGE
+  ADJUSTMENT
+  WASTE
+}
+
+enum ProductionStatus {
+  QUEUED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum OrderStatus {
+  PENDING
+  PREPARING
+  READY
+  COMPLETED
+  CANCELLED
+}
+
+/// Stock-keeping unit of the cafe pantry. `quantity` is the
+/// current on-hand amount in `unit`; `minQuantity` drives the
+/// low-stock indicator on the dashboard.
+model Ingredient {
+  id          String         @id @default(cuid())
+  slug        String         @unique
+  name        String
+  unit        IngredientUnit
+  costCents   Int            @default(0)
+  quantity    Float          @default(0)
+  minQuantity Float          @default(0)
+  isActive    Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  recipeItems    RecipeItem[]
+  stockMovements StockMovement[]
+
+  @@map("ingredients")
+}
+
+/// A sellable cafe product (drink, pastry, meal...).
+model MenuItem {
+  id          String            @id @default(cuid())
+  slug        String            @unique
+  name        String
+  description String?
+  category    MenuItemCategory
+  priceCents  Int
+  prepMinutes Int               @default(5)
+  isActive    Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  recipe      Recipe?
+  orderItems  OrderItem[]
+  productions Production[]
+
+  @@map("menu_items")
+}
+
+/// Recipe of a menu item: which ingredients and how much of
+/// each (in the ingredient's own unit) one portion needs.
+model Recipe {
+  id         String   @id @default(cuid())
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  menuItemId String   @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  items RecipeItem[]
+
+  @@map("recipes")
+}
+
+model RecipeItem {
+  id           String     @id @default(cuid())
+  recipe       Recipe     @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  recipeId     String
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id])
+  ingredientId String
+  quantity     Float
+
+  @@unique([recipeId, ingredientId])
+  @@index([ingredientId])
+  @@map("recipe_items")
+}
+
+/// Audit log of every pantry stock change (deliveries, usage
+/// from completed orders, waste, manual adjustments).
+model StockMovement {
+  id           String            @id @default(cuid())
+  ingredient   Ingredient        @relation(fields: [ingredientId], references: [id])
+  ingredientId String
+  type         StockMovementType
+  quantity     Float
+  note         String?
+  reference    String?
+  createdAt    DateTime          @default(now())
+
+  @@index([ingredientId])
+  @@map("stock_movements")
+}
+
+/// Kitchen production run for a menu item. Order lines become
+/// queued production runs; the kitchen board works through them.
+model Production {
+  id          String           @id @default(cuid())
+  menuItem    MenuItem         @relation(fields: [menuItemId], references: [id])
+  menuItemId  String
+  quantity    Int              @default(1)
+  status      ProductionStatus @default(QUEUED)
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  order   Order?  @relation(fields: [orderId], references: [id])
+  orderId String?
+
+  @@index([status, createdAt])
+  @@index([orderId])
+  @@map("productions")
+}
+
+model Order {
+  id         String        @id @default(cuid())
+  number     String        @unique
+  status     OrderStatus   @default(PENDING)
+  totalCents Int           @default(0)
+  completedAt DateTime?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  items OrderItem[]
+  productions Production[]
+  sale  Sale?
+
+  @@index([status, createdAt])
+  @@map("orders")
+}
+
+model OrderItem {
+  id         String    @id @default(cuid())
+  order      Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId    String
+  menuItem   MenuItem  @relation(fields: [menuItemId], references: [id])
+  menuItemId String
+  quantity   Int
+  priceCents Int
+
+  @@index([orderId])
+  @@map("order_items")
+}
+
+/// A completed sale, created when an order is completed.
+/// Kept as its own model so sales reporting never has to
+/// join against in-flight orders.
+model Sale {
+  id          String   @id @default(cuid())
+  order       Order    @relation(fields: [orderId], references: [id])
+  orderId     String   @unique
+  amountCents Int
+  itemsCount  Int
+  soldAt      DateTime @default(now())
+
+  @@map("sales")
+}
+

@@ -6,15 +6,17 @@
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "allowSyntheticDefaultImports": true,
-    "target": "es2022",
+    "esModuleInterop": true,
+    "target": "ES2022",
     "sourceMap": true,
     "outDir": "./dist",
     "baseUrl": "./",
     "strict": true,
+    "strictPropertyInitialization": false,
     "noUnusedLocals": false,
     "skipLibCheck": true,
     "skipDefaultLibCheck": true,
-        "forceConsistentCasingInFileNames": false
+    "forceConsistentCasingInFileNames": true
   },
   "include": ["src"]
 }
