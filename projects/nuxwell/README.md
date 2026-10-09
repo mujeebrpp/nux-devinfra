@@ -9,10 +9,11 @@ running against a local PostgreSQL container.
 ```
 projects/nuxwell
 ├── apps/
-│   ├── api/          NestJS 11 + Prisma 6 API (port 3091)
+│   ├── api/          NestJS 10 + Prisma 6 API (port 3091)
 │   └── web/          Next.js 16 + Tailwind 4 app (port 3090)
 ├── tests/            Playwright e2e suite
 ├── scripts/          reset-db.ps1, pw-global-setup.mjs
+├── docs/             setup.md (incl. Neon Auth walkthrough)
 ├── .env.local.example
 └── .env.test.example
 ```
@@ -72,12 +73,18 @@ Automated tests never touch `nuxwell_dev`.
 ## Testing
 
 ```powershell
-# API unit + API tests (Jest; migrates nuxwell_test automatically)
+# Full suite: Jest (unit + supertest e2e), then Playwright
+# (both migrate and seed nuxwell_test automatically)
+npm test
+
+# Only the API Jest tests
 npm --prefix apps/api test
 
-# End-to-end tests (starts both servers, prepares nuxwell_test)
-npm test
+# Only the Playwright e2e suite (starts both servers)
+npm run test:e2e
 ```
+
+Current status: Jest 9/9 and Playwright 9/9 passing.
 
 ## Authentication
 

@@ -22,12 +22,16 @@ Reusable local development infrastructure for NuxWell, NuxFarm, NuxCafe and futu
 
 ## Ports
 
-| Service | Address |
-|---|---|
-| PostgreSQL | localhost:5432 |
-| pgAdmin | http://localhost:5050 |
-| Mailpit UI | http://localhost:8025 |
-| Mailpit SMTP | localhost:1025 |
+Ports are configurable in `.env` (defaults from
+`.env.example` shown; this machine's `.env` uses
+`POSTGRES_PORT=5433`):
+
+| Service | `.env` variable | Default |
+|---|---|---:|
+| PostgreSQL | `POSTGRES_PORT` | 5432 |
+| pgAdmin | `PGADMIN_PORT` | 5050 |
+| Mailpit UI | `MAILPIT_UI_PORT` | 8025 |
+| Mailpit SMTP | `MAILPIT_SMTP_PORT` | 1025 |
 
 ## Windows PowerShell
 
@@ -53,22 +57,26 @@ With Docker Desktop WSL integration enabled, do not install a second Docker Engi
 
 ## Application database URLs
 
+Replace `YOUR_PASSWORD` with `POSTGRES_PASSWORD` and
+`PORT` with `POSTGRES_PORT` from your `.env` (5433 on
+this machine).
+
 ### NuxWell
 
 ```
-postgresql://postgres:YOUR_PASSWORD@localhost:5432/nuxwell_dev
+postgresql://postgres:YOUR_PASSWORD@localhost:PORT/nuxwell_dev
 ```
 
 ### NuxFarm
 
 ```
-postgresql://postgres:YOUR_PASSWORD@localhost:5432/nuxfarm_dev
+postgresql://postgres:YOUR_PASSWORD@localhost:PORT/nuxfarm_dev
 ```
 
 ### NuxCafe
 
 ```
-postgresql://postgres:YOUR_PASSWORD@localhost:5432/nuxcafe_dev
+postgresql://postgres:YOUR_PASSWORD@localhost:PORT/nuxcafe_dev
 ```
 
 For automated tests, use the matching `*_test` database.
