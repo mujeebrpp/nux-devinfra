@@ -56,4 +56,8 @@ tests/
 scripts/
 ```
 
-The existing NuxWell and NuxFarm repositories are not modified by this initialization commit. NuxCafe can use this contract when its GitHub repository is created.
+## Project status
+
+- **NuxWell** — implemented in this repository; see `projects/nuxwell/README.md` for the local setup and test instructions.
+- **NuxFarm** — placeholder scaffold only; not yet implemented.
+- **NuxCafe** — placeholder scaffold only; can adopt this contract when its GitHub repository is created.

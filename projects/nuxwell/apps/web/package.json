@@ -1,1 +1,40 @@
-{"name":"nuxwell-web","private":true,"scripts":{"dev":"next dev -p 3090","build":"next build","start":"next start -p 3090","test":"playwright test --config=../../playwright.config.ts"},"dependencies":{"next":"^16.0.0","react":"^19.0.0","react-dom":"^19.0.0"},"devDependencies":{"@playwright/test":"^1.55.0","typescript":"^5.0.0","@types/node":"^22.0.0","@types/react":"^19.0.0","@types/react-dom":"^19.0.0"}}
+{
+  "name": "nuxwell-web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port 3090",
+    "build": "next build",
+    "start": "next start --port 3090",
+    "lint": "eslint .",
+    "format": "prettier --write \"app/**/*.{ts,tsx,css}\" \"components/**/*.{ts,tsx}\" \"lib/**/*.{ts,tsx}\"",
+    "test": "playwright test --config=../../playwright.config.ts"
+  },
+  "dependencies": {
+    "@neondatabase/auth": "^0.5.0-beta",
+    "@radix-ui/react-label": "^2.1.16",
+    "@radix-ui/react-slot": "^1.4.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.53.0",
+    "next": "^16.4.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "tailwind-merge": "^3.7.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.15.0",
+    "@playwright/test": "^1.64.0",
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "eslint": "^9.15.0",
+    "postcss": "^8.5.29",
+    "prettier": "^3.9.9",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.6.3",
+    "typescript-eslint": "^8.0.0"
+  }
+}
