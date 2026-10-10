@@ -1,68 +1,60 @@
 # NuxFarm — MVP Scope
 
-Multi-location farms, crop cycles, operational tasks and irrigation
-records, with a practical ginger-farm workflow.
+Multi-location farm operations for field and soilless growing systems, with a practical crop-cycle workflow. This scope completes and hardens the current implementation rather than replacing it.
 
-## First complete farm workflow
+## Primary workflow
 
-1. Create a farm location
-2. Define a field or hydroponic growing area
-3. Create a ginger crop cycle
-4. Generate or import operational tasks
-5. Record irrigation and completed tasks
-6. Review progress and overdue tasks
+1. Platform admin creates a farm/location and assigns farm administrators.
+2. Farm admin configures a growing area (field, greenhouse, hydroponics or another supported area type).
+3. Farm admin creates a crop cycle with dates and stages.
+4. Tasks are planned from templates or imported from a validated CSV/JSON file.
+5. Operators record task progress, irrigation events and inventory movements.
+6. Dashboard summarizes active crop cycles, upcoming/overdue work, irrigation and inventory.
+7. Reports support review of cycle and task progress.
 
-## Included in the MVP
+## MVP scope
 
-- Multi-location farm administration (farms with codes, timezones,
-  addresses).
-- Farm layouts and growing areas (field, greenhouse, high tunnel,
-  shade house, nursery, storage) with area and codes.
-- Crop cycle creation with start/expected end dates and lifecycle
-  status (`PLANNED | ACTIVE | COMPLETED | ABANDONED`), plus cycle
-  stages with sequence and status.
-- Task templates, planned dates, assignments and completion logs
-  (`TODO | IN_PROGRESS | DONE | BLOCKED | SKIPPED`, priorities).
-- Irrigation event records (method, duration, volume, observations).
-- Basic inventory records for agricultural materials with
-  transactional stock movements (`IN | OUT | ADJUST`) and
-  `balanceAfter` audit trail.
-- CSV/JSON import with validation, preview and per-row error
-  reporting (dry-run before commit).
-- Dashboard for active crop cycles, upcoming tasks and overdue tasks.
-- Reports: operations overview, crop cycle summary, task summary,
-  irrigation summary, inventory summary.
-- Role-based access separating platform administration from farm
-  administration (`OWNER | ADMIN | MEMBER`).
+- Multi-location farms and locations with codes, addresses and timezone.
+- Growing areas and crop cycles with stages, dates and lifecycle status.
+- Task templates, schedule, priority, assignment, status and completion history.
+- Irrigation records: date/time, method, duration, volume and notes.
+- Agricultural material inventory with auditable `IN`, `OUT` and `ADJUST` movements.
+- CSV/JSON import: validate → preview/dry-run → show row errors → explicit commit.
+- Overview dashboard with active cycles, upcoming tasks and overdue tasks.
+- Farm operations, crop-cycle, tasks, irrigation and inventory reports.
+- API-side role and resource checks for platform admins, farm admins and members.
 
-## Deferred
+## Import behavior
 
-Automatic agronomic recommendations, advanced IoT, predictive yield
-analytics, financial accounting, automatic nutrient recipes.
+- Validate schema, required fields, field lengths, enums, numeric ranges and date/time formats before writing.
+- Return a preview summary and row-specific errors; make no writes when required validation fails.
+- Use explicit external IDs or idempotency keys to avoid duplicate historical imports.
+- Never let client-provided farm/location identifiers bypass the caller's permissions.
+- Record import metadata (source name, user, timestamp, counts and validation outcome) without logging secrets or unnecessarily retaining uploaded sensitive content.
+- Apply valid rows in an explicit transaction or documented bounded batches, with a clear all-or-nothing policy for each import operation.
 
-## Ginger / hydroponic data rule
+## Hydroponic ginger data safeguard
 
-Do **not** invent EC, pH, nutrient concentration or fertilizer
-schedules. Until agronomist-approved data is available, the
-application only lets authorized users record observations and
-configure verified values. The schema deliberately stores no
-agronomic chemical values (this is already enforced in the current
-implementation and must be preserved).
+The app may store readings and agronomist-approved targets, but it must **not invent** EC, pH, nutrient concentration, fertilizer quantities or crop-stage feeding schedules. Production recommendations require a qualified agronomist's review and should store units, crop stage, growing system, source/reference, reviewer and effective date. Until that content is approved, support recording observations and label target values as unavailable rather than presenting made-up defaults.
 
-## Current state (see audit.md)
+## Current baseline and remaining work
 
-The full domain schema, API modules (farms, cycles, tasks, irrigation,
-inventory, reports, users) and web pages already exist and work.
-Missing for the MVP: CSV/JSON import, role-based access control,
-a dashboard overview page, Jest tests with a test-database safety
-contract, a project README, and the `/api` global prefix used by the
-other two applications.
+The current branch contains farm/cycle/task/irrigation/inventory/report API modules, Prisma domain models, seed data, a Next.js UI and smoke scripts. The source review identified these remaining tasks; verify them as commits land:
+
+- [ ] Add `/api` global prefix and update all API clients and smoke scripts together.
+- [ ] Add validated CSV/JSON import with preview and row errors.
+- [ ] Add overview dashboard for active cycles and upcoming/overdue tasks.
+- [ ] Enforce API authentication, roles and farm/location resource scope.
+- [ ] Provide Jest/API tests and a fail-closed `nuxfarm_test` database contract.
+- [ ] Complete project setup, test, migration and reset documentation.
+- [ ] Review the two existing init migrations without deleting applied history; test fresh and already-initialized databases.
+- [ ] Use idempotent import and task generation to prevent duplicate tasks.
 
 ## Acceptance criteria
 
-- The farm admin can manage an active crop cycle end to end without
-  manually editing the database.
-- CSV/JSON import validates every row, shows a preview, reports
-  per-row errors, and commits nothing when validation fails.
-- Overdue and upcoming tasks are surfaced on the dashboard.
-- A `MEMBER` cannot perform platform- or farm-admin actions.
+- Farm administrator can complete the primary workflow without editing the database manually.
+- A normal member cannot perform platform/farm-admin operations or access a different farm outside their scope.
+- Valid imports preview and commit; invalid imports report row-level issues and commit nothing.
+- Duplicate import retries do not duplicate cycles/tasks/inventory movements.
+- All API routes use the documented `/api` prefix and are covered by tests.
+- Automated tests refuse any effective database URL not ending in `_test`.
