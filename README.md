@@ -8,7 +8,7 @@ The app implementations already contain working domain code; the next step is st
 
 **Start here:** [MVP programme overview](docs/mvp/README.md)
 
-The plan includes a source-level repository audit, architecture and port contracts, per-app scopes, ordered milestones, acceptance criteria, and a Render/Neon release runbook.
+The plan includes a source-level repository audit, architecture and port contracts, per-app scopes, ordered milestones, acceptance criteria, a detailed [feature-by-feature TODO backlog](docs/mvp/feature-breakdown.md), and a Render/Neon release runbook.
 
 ## Architecture
 
