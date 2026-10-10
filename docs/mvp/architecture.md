@@ -1,92 +1,86 @@
 # Target Architecture
 
-## Developer workstation
+## Operating model
 
-- Windows 10/11, Docker Desktop, WSL2 Ubuntu, VS Code
-- Local services run through Docker Desktop (WSL2 integration); no second
-  Docker Engine inside Ubuntu unless specifically required
+- Developer workstation: Windows 10/11, Docker Desktop, WSL2 Ubuntu and VS Code.
+- Docker Desktop owns the local container runtime; use WSL integration rather than installing a second Docker Engine unless there is a specific requirement.
+- One shared local PostgreSQL server provides separate databases for each application and environment. Sharing the server does not mean sharing application schemas or credentials.
+- Each product deploys as its own Next.js web service and NestJS API service.
 
-## Local infrastructure (Nux Dev Infrastructure)
-
-One Docker Compose stack (`docker-compose.yml` at the repository root):
+## Local infrastructure
 
 | Service | Image | Purpose |
 |---|---|---|
-| PostgreSQL | `postgres:17` | Shared database server, one container |
+| PostgreSQL | `postgres:17` | Local database server |
 | pgAdmin | `dpage/pgadmin4` | Database administration |
-| Mailpit | `axllent/mailpit` | Local email testing (SMTP + UI) |
+| Mailpit | `axllent/mailpit` | Local SMTP capture and email preview |
 
-- Persistent volume for PostgreSQL data; health check on the Postgres service;
-  pgAdmin waits for a healthy Postgres.
-- `postgres/init/01-databases.sql` creates six databases on first volume
-  initialization: development and test databases for each application.
-- PowerShell scripts at `scripts/`: `up.ps1`, `down.ps1`, `status.ps1`,
-  `reset.ps1` (reset requires typing `RESET` and recreates the volume).
-- No Redis, no message broker, no Kubernetes.
+Compose has PostgreSQL health checking, persistent volumes and pgAdmin dependency on healthy PostgreSQL. `postgres/init/01-databases.sql` initializes the six databases on first volume creation.
 
-## Application topology
+No Redis, message broker or Kubernetes is in MVP scope.
 
-Each application is an independently deployable pair with its own schema,
-migrations, credentials, ports and deployment:
+## Ports and databases
 
-| Application | Web | API | Dev database | Test database |
+| Application | Web | API | Development DB | Test DB |
 |---|---:|---:|---|---|
-| NuxWell | `:3090` | `:3091` | `nuxwell_dev` | `nuxwell_test` |
-| NuxFarm | `:3092` | `:3093` | `nuxfarm_dev` | `nuxfarm_test` |
-| NuxCafe | `:3094` | `:3095` | `nuxcafe_dev` | `nuxcafe_test` |
+| NuxWell | 3090 | 3091 | `nuxwell_dev` | `nuxwell_test` |
+| NuxFarm | 3092 | 3093 | `nuxfarm_dev` | `nuxfarm_test` |
+| NuxCafe | 3094 | 3095 | `nuxcafe_dev` | `nuxcafe_test` |
 
-Each app can start without the other two. Each app resolves its environment
-from `.env.local` (development) or `.env.test` (automated tests) at the
-project root; the API picks the file based on `NODE_ENV`.
+Shared service defaults in `.env.example`: PostgreSQL host port 5432, pgAdmin 5050, Mailpit UI 8025 and SMTP 1025. If PostgreSQL host port 5432 is already occupied, a developer may set `POSTGRES_PORT=5433` in their ignored local `.env`; update application host URLs consistently. Inside Docker networking, PostgreSQL remains port 5432 and pgAdmin should connect to host `postgres`, port 5432.
+
+Never document a machine-specific port as if it were a repository-wide default.
+
+## Application separation
+
+Each application owns its:
+
+- Next.js web app and NestJS API app;
+- Prisma schema, migration history, generated client and seed;
+- `*_dev` and `*_test` database URLs;
+- tests, environment examples and README;
+- Render services and production database credentials.
+
+A product must start and be deployed independently of the other two.
 
 ## Technology standards
 
 | Layer | Standard |
 |---|---|
 | Web | Next.js 16 App Router, TypeScript |
-| UI | Tailwind CSS v4, shadcn/ui |
+| UI | Tailwind CSS v4; shadcn/ui where already used |
 | API | NestJS 10, TypeScript |
 | Database | PostgreSQL 17 locally; Neon PostgreSQL in production |
-| ORM | Prisma 6 (per-app schema, migrations and seed) |
-| Validation | Zod for shared/web validation; class-validator or a consistent Zod integration for API DTOs |
-| Authentication | Neon Auth (Managed Better Auth); enforced in production, optional open mode locally |
-| Testing | Jest, Supertest, Playwright |
-| Local infrastructure | Docker Desktop, Docker Compose, WSL2 |
-| Deployment | GitHub, Render, Neon |
-| Email testing | Mailpit locally; configured provider in production |
+| ORM | Prisma 6, per-application schema and migrations |
+| Validation | Validate all inputs; keep current class-validator or Zod approach unless a concrete defect motivates change |
+| Authentication | Neon Auth / managed Better Auth integration; optional only in local development |
+| Testing | Jest, Supertest and Playwright |
+| Local environment | Docker Desktop, Compose and WSL2 |
+| Hosting | GitHub, Render and Neon |
+| Email | Mailpit locally; production email provider configured by environment |
 
-## Repository layout
+## Environment contracts
 
-```
-nux-devinfra/
-├── docker-compose.yml          # postgres + pgadmin + mailpit
-├── postgres/init/              # six-database init SQL
-├── scripts/                    # up / down / status / reset (+ migrate-all, seed-all)
-├── docs/mvp/                   # this programme documentation
-└── projects/
-    ├── nuxwell/                # apps/web, apps/api, prisma, tests, scripts
-    ├── nuxfarm/                # apps/web, apps/api, prisma, tests, scripts
-    └── nuxcafe/                # apps/web, apps/api, prisma, tests, scripts
-```
-
-Each project keeps independent `apps/web`, `apps/api`, Prisma schema,
-migrations, seed and tests, plus its own README and environment examples
-(`.env.local.example`, `.env.test.example`). Real secrets are never committed.
-
-## Non-goals for the MVP (deferred)
-
-- Kubernetes, microservice splitting, Redis, complex observability infrastructure
-- A central cross-product admin portal
-- Payments, delivery integrations, accounting, advanced purchasing
-- AI features, leaderboards, predictive analytics, automatic agronomic
-  recommendations
+- Development selects `.env.local` and a matching `*_dev` database.
+- Test selects `.env.test` and a matching `*_test` database.
+- Production uses injected platform environment variables; do not read developer env files.
+- Validate required variables at startup and stop on invalid configuration.
+- Never commit real credentials, access tokens, session secrets, private user data or production URLs in examples.
+- The test-database guard must run before migrations, cleanup or writes, in every test entry point (Jest, Playwright, scripts and CI).
 
 ## API conventions
 
-- Consistent `/api` global prefix on every NestJS API (NuxWell and NuxCafe
-  already do this; NuxFarm is brought into line in Phase 0).
-- DTO validation on every input; standard error responses via a shared
-  exception filter pattern.
-- Pagination metadata (`page`, `limit`, `total`, `totalPages`) on list
-  endpoints; capped `limit` (max 100).
-- Structured logs with request IDs where supported by the framework.
+- All APIs use the `/api` prefix, including health endpoints. NuxFarm's source-level bootstrap must be aligned with NuxWell/NuxCafe and the clients/smoke scripts updated in the same change.
+- Validate request bodies, query parameters and path values. Reject unknown fields where the framework supports it.
+- Return consistent error responses and capped pagination metadata (`page`, `limit`, `total`, `totalPages`) on list endpoints.
+- Set CORS allowlists explicitly from environment variables.
+- Enforce authentication, roles and resource ownership in the API. UI hiding is never an access-control boundary.
+- Add request correlation IDs and avoid logging secrets or sensitive personal information.
+
+## Release architecture
+
+GitHub pull request → CI → reviewed merge → explicit Prisma release migration → Render web/API deploy → remote smoke test. Each app has separate Neon credentials/database. Migrations are not run automatically in production API startup.
+
+## MVP non-goals
+
+Kubernetes, Redis, a central cross-product admin console, online payments, delivery integrations, accounting suite, predictive AI, leaderboards, IoT automation and unreviewed agronomic recommendations.
