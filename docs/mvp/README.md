@@ -1,53 +1,53 @@
 # Nux Dev Platform — MVP Programme
 
-Coordinated MVP programme covering four deliverables: the shared development
-platform (**Nux Dev Infrastructure**) and three independently deployable business
-applications (**NuxWell**, **NuxFarm**, **NuxCafe**).
+Coordinated MVP plan for the shared development platform and three independently deployable business applications: **Nux Dev Infrastructure**, **NuxWell**, **NuxFarm** and **NuxCafe**.
 
-The goal is not to finish three complete business products at once. First we
-establish a reliable shared development platform, then deliver one working
-business workflow per application using the same engineering standards.
+The repository already contains substantial application code. This programme is therefore an implementation-aware stabilization and completion plan—not a greenfield rewrite. Preserve useful modules, test claims with executable evidence, and make changes in dependency order.
 
-## Document index
+## Current programme status
 
-| Document | Purpose |
-|---|---|
-| [architecture.md](architecture.md) | Target architecture, ports, technology standards, non-goals |
-| [scope-nuxwell.md](scope-nuxwell.md) | NuxWell MVP scope: facility discovery, availability, booking, dashboard, admin |
-| [scope-nuxfarm.md](scope-nuxfarm.md) | NuxFarm MVP scope: farms, crop cycles, tasks, irrigation, import, dashboard |
-| [scope-nuxcafe.md](scope-nuxcafe.md) | NuxCafe MVP scope: ingredients, recipes, menu, orders, production, stock |
-| [milestones.md](milestones.md) | Phase 0–4 plan with exit gates, mapped to backlog epics |
-| [acceptance-criteria.md](acceptance-criteria.md) | Definition of Done and per-application acceptance tests |
-| [deployment.md](deployment.md) | Render/Neon deployment design, release steps, rollback runbook |
-| [audit.md](audit.md) | Audit of the current repository: what exists, what is missing, Phase 0 fix list |
-
-## Backlog epics (initial GitHub Issues / Project board)
-
-| Epic | Priority | Area |
+| Workstream | Baseline status | Next gate |
 |---|---|---|
-| INF-1 Infrastructure hardening | P0 | Platform |
-| INF-2 Environment and database safety | P0 | Platform |
-| INF-3 CI build and test pipeline | P0 | Platform |
-| NW-1 Facilities and services | P1 | NuxWell |
-| NW-2 Availability and booking integrity | P1 | NuxWell |
-| NW-3 Customer dashboard and admin | P1 | NuxWell |
-| NF-1 Farm locations and crop cycles | P1 | NuxFarm |
-| NF-2 Tasks and irrigation logs | P1 | NuxFarm |
-| NC-1 Ingredients, recipes and menu | P1 | NuxCafe |
-| NC-2 Orders, production and stock | P1 | NuxCafe |
-| REL-1 Security, smoke tests and release | P0 | All |
+| Shared infrastructure | Compose and PowerShell operations scripts present | Clean checkout; env and reset safety checks; repeatable migrations/seeds |
+| NuxWell | Facilities, user/facility/service/booking models and UI baseline present | Complete booking availability/create/history/cancel with concurrency-safe capacity enforcement |
+| NuxFarm | Farm/cycle/task/irrigation/inventory/report modules and UI pages present | Standardize API prefix; complete imports, operational dashboard, authorization and test contract |
+| NuxCafe | Menu/recipe/stock/order/production/sales vertical slice present | API authorization and stock/order concurrency and failure-path proof |
+| CI/release | No GitHub Actions workflow was found in the audited branch | Green clean-install build/test pipeline and release runbooks |
 
-## Guiding principles
+See [audit.md](audit.md) for detailed source findings. Test counts mentioned in READMEs or commit messages are historical reports until re-run in CI.
 
-1. **Shared standards, not shared data.** The three applications share
-   engineering patterns and scripts — never a business database or a common
-   API that couples them.
-2. **One vertical slice at a time.** Each application gets one genuinely usable
-   workflow end to end (UI → validated API → migrated database → tests) before
-   the next feature is started.
-3. **Test isolation is a hard safety control.** Automated tests only ever run
-   against `*_test` databases. Development and production data are never used.
-4. **Use the existing stack.** Next.js 16 App Router, Tailwind CSS v4, shadcn/ui,
-   NestJS 10, Prisma 6, Zod, PostgreSQL 17 (local) / Neon (production), Jest,
-   Supertest, Playwright, Docker Desktop, Render. No new framework or
-   infrastructure service is introduced during the MVP.
+## Read the plan in order
+
+1. [architecture.md](architecture.md) — stack, database isolation, ports and API conventions.
+2. [audit.md](audit.md) — source-level baseline and prioritized blockers.
+3. [milestones.md](milestones.md) — dependency-ordered work and objective phase exit gates.
+4. [scope-nuxwell.md](scope-nuxwell.md) — booking workflow and integrity rules.
+5. [scope-nuxfarm.md](scope-nuxfarm.md) — crop-cycle workflow, imports and agronomy safeguards.
+6. [scope-nuxcafe.md](scope-nuxcafe.md) — order, production and stock integrity.
+7. [acceptance-criteria.md](acceptance-criteria.md) — definition of done and required tests.
+8. [deployment.md](deployment.md) — Render/Neon release, migration and rollback procedure.
+
+## Initial backlog
+
+| Epic | Priority | Focus |
+|---|---|---|
+| INF-1 | P0 | Infrastructure hardening and repeatable setup |
+| INF-2 | P0 | Environment, migration, reset and test database safety |
+| INF-3 | P0 | GitHub Actions clean-install/build/test pipeline |
+| REL-1 | P0 | API security, production auth, smoke test and release safety |
+| NW-2 | P0 | Transaction-safe availability and booking integrity |
+| NW-1 / NW-3 | P1 | Facility detail, customer dashboard and admin workflow |
+| NF-1 / NF-2 | P1 | Farm cycles, tasks, irrigation, import and overview |
+| NC-2 | P0 | Order/stock concurrency and failure-path verification |
+| NC-1 | P1 | Ingredient, recipe and menu completeness |
+
+## Non-negotiable engineering rules
+
+- **No Redis** or new infrastructure service during the MVP.
+- Share patterns and infrastructure only; keep per-app business schemas, migrations, credentials and databases separate.
+- Automated tests, destructive setup and test cleanup must refuse database URLs not ending in `_test`.
+- UI visibility is not authorization. Protect sensitive APIs and resource ownership server-side; production must fail closed if auth is absent.
+- Booking and stock invariants must hold under concurrent requests, not merely sequential happy-path tests.
+- Do not reset production data or rewrite migration history casually.
+- Do not manufacture ginger hydroponic EC/pH/nutrient targets. Use agronomist-approved values with units, stages, source and effective dates.
+- A task is complete only when executable test results are recorded against the commit being reviewed.
