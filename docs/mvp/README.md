@@ -20,6 +20,7 @@ See [audit.md](audit.md) for detailed source findings. Test counts mentioned in 
 
 1. [architecture.md](architecture.md) — stack, database isolation, ports and API conventions.
 2. [audit.md](audit.md) — source-level baseline and prioritized blockers.
+3. [feature-breakdown.md](feature-breakdown.md) — detailed feature-by-feature TODOs, priorities, dependencies and acceptance checks.
 3. [milestones.md](milestones.md) — dependency-ordered work and objective phase exit gates.
 4. [scope-nuxwell.md](scope-nuxwell.md) — booking workflow and integrity rules.
 5. [scope-nuxfarm.md](scope-nuxfarm.md) — crop-cycle workflow, imports and agronomy safeguards.
