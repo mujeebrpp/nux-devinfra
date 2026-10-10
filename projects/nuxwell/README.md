@@ -20,7 +20,7 @@ projects/nuxwell
 
 ## Prerequisites
 
-- Node.js 22 LTS
+- Node.js 24 LTS
 - Docker (for the `nux-dev-postgres` service defined in the
   repository root `docker-compose.yml`)
 - Playwright browsers: `npx playwright install chromium`
