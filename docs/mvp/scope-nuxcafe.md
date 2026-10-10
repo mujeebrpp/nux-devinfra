@@ -1,73 +1,62 @@
 # NuxCafe — MVP Scope
 
-Ingredients, recipes, menu items, production and order tracking for a
-small snack kitchen.
+Ingredients, recipes, menu items, orders, kitchen production and auditable stock movements for a small snack kitchen. The current code already has substantial domain functionality; the MVP emphasis is authorization and proving stock integrity under failure and concurrency.
 
-## First complete kitchen workflow
+## Primary workflow
 
-1. Register ingredients and units
-2. Create recipes with ingredient quantities
-3. Publish menu items with selling prices
-4. Record an order
-5. Record production and ingredient usage
-6. Review order status and stock balance
+1. Register ingredients and opening stock.
+2. Create recipes with measured ingredient quantities.
+3. Create menu items and selling prices.
+4. Create an order whose totals are calculated by the server.
+5. Track production status.
+6. Complete or cancel the order under allowed state transitions.
+7. Review stock balances, low-stock warnings and daily sales totals.
 
-## Included in the MVP
+## MVP scope
 
-- Ingredients with units (`G | KG | ML | L | PCS`), unit cost,
-  opening stock and low-stock thresholds.
-- Recipes with ingredient quantities and estimated recipe cost.
-- Menu items with selling prices, category, prep time and
-  availability.
-- Order creation and status tracking
-  (`PENDING | PREPARING | READY | COMPLETED | CANCELLED`).
-- Production batches with lifecycle
-  (`QUEUED | IN_PROGRESS | COMPLETED | CANCELLED`).
-- Stock adjustments and low-stock warnings on the dashboard.
-- Basic daily order totals and production reports (sales summary).
-- Role-based kitchen/admin access.
+- Ingredients with explicit units, unit cost, current stock and low-stock threshold.
+- Recipes and recipe items with computed ingredient cost.
+- Menu items, categories, preparation metadata, price and availability.
+- Order lines, server-calculated totals and explicit status transitions.
+- Production batches and history.
+- Stock adjustments and consumption movements with audit trail.
+- Dashboard for sales/order summaries and low-stock warnings.
+- API-side authentication, role/ownership enforcement and integration tests.
 
-## Deferred
+Online payments, delivery integration, accounting, advanced procurement, multi-branch operations and predictive demand planning remain deferred.
 
-Online payments, delivery integrations, accounting, advanced
-purchasing, multi-branch franchise management, complex demand
-forecasting.
+## Stock and order integrity
 
-## Stock consistency (critical requirement)
+Preserve and test the current transactional completion design:
 
-Stock consumption must be recorded **transactionally**. A cancelled or
-failed order must not silently leave stock in an incorrect state. The
-implemented design (keep and extend):
+1. Validate order items and compute the order total from trusted, current menu prices on the server.
+2. Before completion, verify required stock from the recipe requirements.
+3. In one transaction, consume ingredient stock, write corresponding usage movements, transition eligible production runs/order state and create the sale record.
+4. If any operation fails, the whole transaction rolls back.
+5. Cancellation before completion must not consume stock. Completed orders should not be silently cancelled in a way that erases the sale/stock history; define an explicit reversal workflow if post-completion refunds are ever added.
 
-1. Order creation validates every menu item slug, computes the total
-   from current prices, and queues one production run per line.
-2. Order completion runs a pre-flight stock check, then a single
-   transaction that: decrements each ingredient, writes a `USAGE`
-   stock movement per ingredient, completes the order's active
-   production runs, marks the order `COMPLETED`, and creates the
-   `Sale`. Any failure rolls the whole transaction back.
-3. Cancellation only affects orders still in an active status and
-   cancels their production runs — it never consumes stock, because
-   stock is only consumed at completion.
+Additional requirements:
+- Guard state transitions so duplicate completion calls are idempotent or rejected.
+- Protect against concurrent orders consuming the same remaining stock. Use transaction isolation or row-level locking and retry/409 behavior as appropriate; preflight reads alone do not prevent overselling.
+- Keep stock balance and stock movement ledger reconcilable. Any manual adjustment must create an auditable movement.
+- Calculate low-stock state consistently from current balance and threshold.
 
-## Current state (see audit.md)
+## Current baseline and remaining work
 
-NuxCafe is the most complete application: full domain schema, all API
-modules (ingredients, menu-items, recipes, stock, production, orders,
-sales, dashboard, health), the transactional order flow described
-above, a full web dashboard with Neon Auth hooks, Jest (9 suites /
-46 tests) and Playwright (13 smoke tests) with a test-database safety
-contract, and a comprehensive README.
+The current branch includes ingredient/menu/recipe/stock/production/order/sales modules, a web dashboard and an order completion transaction. Repository README/commit history reports Jest and Playwright coverage; rerun CI before considering the counts current.
 
-Remaining for the MVP: role-based access enforcement on the API,
-low-stock warning verification, cancellation/failure-path tests, and
-production auth enforcement.
+- [ ] Inventory all routes and enforce auth and kitchen/admin roles at API level.
+- [ ] Add tests for insufficient stock, transaction rollback and cancellation.
+- [ ] Add concurrent/duplicate order completion tests.
+- [ ] Verify low-stock warnings and daily totals against underlying stock/sale records.
+- [ ] Verify production auth configuration fails closed.
+- [ ] Ensure test guards cover Jest, Playwright and helper scripts and refuse non-`_test` databases.
 
 ## Acceptance criteria
 
-- An order can be processed and ingredient usage reconciles exactly
-  (stock movements balance against on-hand quantities).
-- Completing an order with insufficient stock fails cleanly and
-  changes nothing.
-- Cancelling an order before completion leaves stock untouched.
-- Unauthenticated/kitchen-role users cannot access admin actions.
+- Completion creates one sale and matching ingredient usage movements.
+- Insufficient stock changes no order, production, sale or stock state.
+- Cancelled incomplete orders do not consume stock.
+- Concurrent or repeated completion cannot double-consume stock or create duplicate sales.
+- Role checks are enforced by the API, not solely by dashboard navigation.
+- All acceptance tests run against `nuxcafe_test`.
