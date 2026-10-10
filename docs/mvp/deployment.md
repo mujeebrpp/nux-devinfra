@@ -1,91 +1,86 @@
-# Deployment Design
+# Deployment Design and Runbook
 
-## Platforms
+## Target hosting
 
 | Platform | Role |
 |---|---|
-| GitHub | Source control, pull requests, CI |
-| Render | 3 web services + 3 API services |
-| Neon | Separate per-application databases and access credentials |
+| GitHub | Source control, review and CI |
+| Render | Three independently deployable web services and three API services |
+| Neon PostgreSQL | Separate production database and credentials per application |
 | Neon Auth | Production authentication |
 
-## Service map
+Service map:
 
-| Application | Render web service | Render API service | Neon database |
+| App | Web service | API service | DB |
 |---|---|---|---|
-| NuxWell | `nuxwell-web` (:3090 equivalent) | `nuxwell-api` | `nuxwell` (production) |
-| NuxFarm | `nuxfarm-web` | `nuxfarm-api` | `nuxfarm` (production) |
-| NuxCafe | `nuxcafe-web` | `nuxcafe-api` | `nuxcafe` (production) |
+| NuxWell | `nuxwell-web` | `nuxwell-api` | dedicated NuxWell production DB |
+| NuxFarm | `nuxfarm-web` | `nuxfarm-api` | dedicated NuxFarm production DB |
+| NuxCafe | `nuxcafe-web` | `nuxcafe-api` | dedicated NuxCafe production DB |
 
-Each web/API pair deploys independently. A change to one application
-never requires deploying the others.
+Service names are proposed conventions, not a statement that these Render services already exist. Verify the actual dashboard settings before deployment.
 
 ## Environment separation
 
-- **Local development:** Docker PostgreSQL (`nux-dev-postgres`),
-  per-app `*_dev` databases, optional open auth mode, Mailpit for
-  email.
-- **CI/test:** dedicated PostgreSQL service, per-app `*_test`
-  databases only.
-- **Production:** Neon PostgreSQL, per-app database and credentials,
-  real environment variables injected by Render (no env files are
-  read in production), Neon Auth enforced.
+- **Local development:** Docker PostgreSQL; project-specific `*_dev` DB, local environment files and Mailpit.
+- **CI/test:** disposable PostgreSQL service and project-specific `*_test` DB only.
+- **Production:** Neon PostgreSQL and platform-injected variables. Never load `.env.local` or `.env.test` in production.
+- Each application uses distinct production credentials and least-privilege access.
+- Local and CI credentials must never point to production. Do not paste credentials into logs, source control or issue comments.
 
-Local development never connects to a Neon database, and production
-never connects to the local Docker container.
+## CI requirements before production deployment
 
-## Database migrations
+A GitHub Actions workflow should:
 
-Migrations are an **explicit release step**, not an uncontrolled
-action on application startup:
+1. Trigger for relevant pull requests and pushes to the target branch.
+2. Install from committed lockfiles using a deterministic install command.
+3. Run Prisma schema validation and client generation for each application.
+4. Provision disposable PostgreSQL and migrate only test databases.
+5. Run each API's unit/integration tests and each web/API build.
+6. Run Playwright smoke tests against locally started services when feasible, preserving traces/screenshots for failures.
+7. Fail if test setup is given a database URL whose database name does not end in `_test`.
+8. Publish a clear summary of commands and test results.
 
-1. Developer commits schema change + `prisma migrate dev` migration
-   files.
-2. CI runs `prisma migrate deploy` against the `*_test` database to
-   verify the migration applies cleanly.
-3. On release, the deploy pipeline (or operator) runs
-   `prisma migrate deploy` against the production Neon database
-   before the new API service goes live.
-4. Applications start with the deployed schema; startup does not
-   auto-migrate.
+Never treat a workflow file's presence as proof that CI is green; inspect the run on the exact commit.
 
-Keep test, staging and production database URLs separate. Never run
-`prisma migrate reset` against a shared database.
+## Release procedure (per application)
 
-## Authentication in production
+1. **Review** — merge only after CI is green and code review covers authorization, migration compatibility and error handling.
+2. **Prepare** — confirm Render build/start commands and required environment variables; confirm the target Neon database and backup/snapshot recovery path.
+3. **Migrate** — execute the application's explicit `prisma migrate deploy` release command against the intended production database. Check logs and migration status before the new API version is enabled.
+4. **Deploy** — deploy the affected API and web service. Do not run production migrations automatically during application startup.
+5. **Smoke test** — check health endpoint under the documented `/api` prefix, key read path, and a safe test workflow that does not create real bookings or consume real inventory.
+6. **Observe** — inspect Render logs and error rates; confirm no secrets or personal data leak into logs.
+7. **Record** — record app, release commit SHA, migration identifier, deployment time, smoke results and operator.
 
-- Neon Auth (Managed Better Auth) is **required** in production:
-  the web app proxies auth traffic through its same-origin
-  `/api/auth/[...path]` route so session cookies are set on the
-  app's own domain.
-- The API validates the session and maps the Neon Auth subject to
-  the local `User` via `authSubjectId`; role guards enforce
-  authorization per application.
-- "Open local development mode" (when `NEON_AUTH_BASE_URL` /
-  `NEON_AUTH_COOKIE_SECRET` are unset) must never be reachable in
-  production: production always supplies real values.
+Deploy each app independently. A change in one app should not require a release of the other two.
 
-## Rollback runbook
+## Authentication and access control
 
-1. **Web/API rollback:** redeploy the previous Render service
-   snapshot. Next.js and NestJS deploys are stateless; rolling back
-   the service is safe as long as the database schema is compatible.
-2. **Migration rollback:** Prisma migrations are forward-only.
-   For a schema regression, write a new corrective migration rather
-   than reverting; if the corrective migration is non-trivial,
-   restore the Neon database from a snapshot (Neon supports
-   point-in-time restore) and redeploy the previous service version.
-3. **Data-only issues:** use the application's own adjustment
-   endpoints (e.g. NuxCafe stock adjustments, NuxFarm inventory
-   transactions) so every change stays in the audit trail.
+- Require production Neon Auth configuration; fail closed if required variables are missing.
+- Validate sessions at the API boundary and map identity to a local user record.
+- Enforce roles, resource ownership and farm/location boundaries in API guards/services.
+- Use explicit CORS origin allowlists and secure cookie/session settings.
+- Test unauthorized and cross-resource requests before release.
+- Avoid logging authorization headers, cookies, passwords, raw tokens or secrets.
+
+## Rollback and recovery
+
+1. **Application rollback:** redeploy the previous Render service version only if its schema remains compatible.
+2. **Schema issue:** Prisma migrations are forward-only by default. Prefer a new corrective migration. Never delete/edit an applied migration to simulate rollback.
+3. **Data issue:** stop unsafe writes, assess audit records, and use an approved restore/correction procedure. A point-in-time restore can discard newer writes; agree on the restore point and data-loss impact before executing.
+4. **Cafe stock/order issue:** preserve stock movement history and reconcile balances; avoid manually changing stored quantities without an auditable adjustment.
+5. **Farm import issue:** use import metadata and idempotency keys to identify affected rows before a controlled correction.
+6. Record incident timeline, affected commit, migration, recovery actions and validation after restoration.
 
 ## Release checklist
 
-- [ ] CI green on the merge commit.
-- [ ] `prisma migrate deploy` verified against a fresh `*_test`
-      database in CI.
-- [ ] Production Neon database credentials rotated/verified per app.
-- [ ] Neon Auth production values configured for the web service.
-- [ ] Render environment variables match `.env.*.example` contracts.
-- [ ] Smoke tests pass against the deployed web and API services.
-- [ ] Rollback path confirmed before the release is announced.
+- [ ] CI green on the exact commit being released.
+- [ ] Fresh test database successfully migrates using deploy-mode migrations.
+- [ ] Target production database and credentials verified for the correct app.
+- [ ] Backup/snapshot and recovery owner/time window confirmed.
+- [ ] All required production auth values present; open local-dev auth mode impossible in production.
+- [ ] CORS, API base URLs and health checks match the service configuration.
+- [ ] Migration executed as a separate release step and verified.
+- [ ] Web/API deploy succeeds and smoke checks pass without affecting real records.
+- [ ] Rollback route is understood and schema compatibility checked.
+- [ ] Commit SHA, migration, smoke results and deployment timestamp recorded.
