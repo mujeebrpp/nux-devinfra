@@ -1,71 +1,58 @@
 # NuxWell — MVP Scope
 
-Wellness facility discovery, availability, booking, customer accounts
-and an admin facility-management workflow.
+Wellness facility discovery and safe booking, with customer history and a protected facility-management workflow. Retain the current facilities/services schema and extend it to complete the workflow.
 
-## First complete business workflow
+## Primary workflow
 
-1. Customer opens facilities (public homepage + listing)
-2. Views facility and service details
-3. Checks availability
-4. Creates a booking
-5. Sees the booking in their dashboard
-6. Admin manages facilities and bookings
+1. Customer browses/searches available facilities.
+2. Customer opens facility and service details including duration, capacity and price.
+3. Customer checks availability for a valid time window.
+4. Customer creates a booking.
+5. Customer views booking history and cancels a cancellable booking.
+6. Admin manages facilities/services and reviews bookings.
 
-## Included in the MVP
+## MVP scope
 
-- Public homepage and facility listing with search and pagination.
-- Facility details: services, duration, capacity and pricing.
-- Customer registration and login (Neon Auth).
-- Availability lookup and booking creation.
-- Customer dashboard: booking history and cancellation where allowed.
-- Admin: facility/service management and booking list.
-- Seed data: facilities, services, membership plans and a demo
-  account (`demo@nuxwell.local`) plus an admin account
-  (`admin@nuxwell.local`).
-- Database-backed health endpoint and end-to-end booking tests.
+- Public facility listing with search/pagination and detail pages.
+- Services tied to facilities, including duration and booking capacity rules.
+- Neon Auth integration and local user mapping through `authSubjectId`.
+- Availability lookup, booking creation, booking history and cancellation.
+- Admin facility/service management and booking list.
+- Database-backed health endpoint, seed data and API/E2E tests.
+- Usable loading, empty, validation, success and error states.
 
-## Deferred
+Payments, recurring family booking, complex membership entitlements, trainer scheduling, AI fitness testing and leaderboards remain deferred.
 
-Payments, recurring family-group booking, memberships with complex
-entitlements, trainer scheduling, AI fitness testing, leaderboards.
+## Booking integrity
 
-## Booking integrity (critical requirement)
+The UI's availability result can become stale. Booking creation must revalidate and enforce the invariant on the server and in the database transaction:
 
-Hiding unavailable slots in the UI is **not sufficient**. The API and
-database path must enforce:
+- `endsAt > startsAt`; duration matches the selected service.
+- Facility and service are active, and service belongs to the facility.
+- Only authenticated users can create bookings; user identity is derived from the validated session, not trusted from arbitrary request bodies.
+- Capacity rules include all non-cancelled bookings that overlap the requested half-open interval `[startsAt, endsAt)`.
+- Cancellation requires booking ownership or admin permission and a cancellable state.
+- Booking create and cancellation are transaction-safe under contention. Choose and document a PostgreSQL locking/constraint/serializable strategy; a count followed by insert under ordinary read-committed isolation may still oversell under concurrent requests.
+- Conflict and capacity violations return predictable `409 Conflict`; malformed or invalid inputs return appropriate 4xx responses.
 
-1. **No capacity overbooking.** Booking creation runs in a transaction
-   that counts existing non-cancelled bookings overlapping the requested
-   `[startsAt, endsAt)` window for the facility and rejects the request
-   when `existing + 1 > facility.capacity`.
-2. **Valid time window.** `endsAt > startsAt`; duration must match the
-   selected service's `durationMinutes`.
-3. **Referential integrity.** The booking must reference an active
-   facility, an active service of that facility, and the authenticated
-   user.
-4. **Cancellation rules.** Only the booking owner (or an admin) can
-   cancel; only bookings in a cancellable status (`PENDING`/`CONFIRMED`)
-   can be cancelled; cancellation is immediate and frees the capacity.
+If the business rule is a capacity count shared by overlapping bookings, implement concurrency protection at the correct capacity scope (facility, service, resource or slot). Do not assume a simple unique constraint alone handles arbitrary overlapping time ranges.
 
-Concurrency control: the overlap check and the insert happen inside a
-single Prisma transaction; under contention the transaction retries or
-fails cleanly with a `409 Conflict` response.
+## Current baseline and remaining work
 
-## Current state (see audit.md)
+The repository currently has facility/service data, the Booking model, seed data and facility-oriented pages/API. Based on the source audit, the booking domain is not yet complete.
 
-The `Booking` model and seed data already exist. The bookings API
-module, availability endpoint, cancellation, auth guards and the web
-booking flow are **not yet implemented** — this is the Phase 1
-vertical slice.
+- [ ] Implement availability, create, list/history and cancellation endpoints.
+- [ ] Implement session-to-local-user mapping and API role/ownership guards.
+- [ ] Add facility/service detail and booking UI states.
+- [ ] Add transactional capacity/overlap prevention and concurrency tests.
+- [ ] Add Playwright journey covering create → history → cancel.
+- [ ] Ensure all test setup refuses any database name not ending in `_test`.
 
 ## Acceptance criteria
 
-- A customer can complete the booking workflow in the UI against a
-  real test database.
-- Two concurrent bookings that would exceed facility capacity cannot
-  both succeed (tested with parallel requests).
-- Overlapping-window validation, invalid duration and unknown
-  facility/service all return standard 4xx errors.
-- Unauthenticated users cannot create/cancel bookings; non-admin
-  users cannot manage facilities.
+- A customer can book using the UI and see the booking in their dashboard.
+- Invalid facility/service, duration or time range is rejected.
+- Parallel requests cannot exceed configured capacity.
+- Only the booking owner or a permitted admin can cancel.
+- Anonymous users and non-admins are blocked from protected endpoints.
+- Tests run only against `nuxwell_test` and do not rely on development data.
