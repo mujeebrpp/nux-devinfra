@@ -1,109 +1,117 @@
 # MVP Delivery Milestones
 
-This sequence assumes one primary developer using coding assistance.
-It is a planning estimate, not a commitment.
+This is a dependency-ordered delivery plan for one primary developer using coding assistance. Week ranges are estimates, not commitments; exit gates and test evidence determine completion.
 
-## Phase 0 — Stabilize infrastructure (Week 1)
+## Phase 0 — Establish a safe, repeatable baseline
 
-**Goal:** a clean checkout builds and runs everything.
+**Goal:** a clean checkout can start the infrastructure, run each app independently, and test without touching development or production data.
 
-Tasks:
-- Resolve PostgreSQL port and environment-file inconsistencies
-  (`status.ps1` hardcodes 5432 while the machine uses 5433).
-- Add destructive database safeguards (reset requires explicit
-  confirmation; CI and tests only use `*_test` databases).
-- Validate Prisma schema and migration commands for all three apps.
-- Confirm clean dependency installation (committed lockfiles) and
-  production auth behaviour.
-- Establish GitHub Actions (build, database checks, tests).
-- Standardize NuxFarm API: `/api` global prefix, Jest config with
-  test-database safety contract, project README; consolidate the
-  double init migration history.
-- Add `scripts/migrate-all.ps1` and `scripts/seed-all.ps1` for the
-  three development databases; extend `reset.ps1` to re-migrate and
-  re-seed after a volume reset.
+### Work items
 
-**Exit gate:** infrastructure and all app builds work from a clean
-checkout.
+1. **Infrastructure and environment contract**
+   - Fix `scripts/status.ps1` so the host-side PostgreSQL port comes from `.env`; container-internal connections continue to use port 5432.
+   - Check required variables at startup and document which files each app uses in development, test and production. Do not load local environment files in production.
+   - Validate the Docker Compose file and confirm the six expected databases are created on a fresh volume.
+   - Keep destructive reset explicit and confirmation-protected. Add migrate/seed orchestration without making ordinary startup destructive.
 
-## Phase 1 — NuxWell vertical slice (Weeks 2–3)
+2. **Test isolation and CI**
+   - Add a common test-safety contract to every Jest, Playwright, migration, seed and reset entry point. Refuse to run any destructive test setup unless the selected database name ends in `_test`.
+   - Add GitHub Actions to install dependencies from lockfiles, validate/generate Prisma clients, start a disposable PostgreSQL service, migrate clean test databases, run unit/API tests, build all web/API apps and run Playwright smoke tests.
+   - Verify that every app's test command actually discovers tests; do not use `--passWithNoTests` as a substitute for coverage.
+   - Publish logs and screenshots/traces as workflow artifacts for failed E2E checks where practical.
 
-**Goal:** first production-shaped business workflow.
+3. **API/runtime conventions**
+   - Add the `/api` global prefix to NuxFarm and update health/domain scripts and web clients in the same change.
+   - Review the two NuxFarm init migrations. Preserve migration history; prove a clean database deploy and document how an existing developer database advances.
+   - Add a project README for NuxFarm if it is still missing after implementation.
+   - Confirm all applications use the documented ports: NuxWell web/API 3090/3091, NuxFarm 3092/3093, NuxCafe 3094/3095.
 
-Tasks:
-- Bookings API module: availability lookup, booking creation with
-  transactional capacity/overlap enforcement, cancellation with
-  ownership and status rules.
-- Session auth middleware (Neon Auth cookie → local `User` via
-  `authSubjectId`) and role guards.
-- Admin facility/service management endpoints behind the guard.
-- Web: facility detail → availability → booking creation flow;
-  dashboard booking history with cancellation; loading, empty,
-  validation and error states.
-- Jest e2e tests for conflict, overbooking, validation and
-  authorization; Playwright end-to-end booking journey; seed update.
+4. **Authentication/security baseline**
+   - Inventory API controllers and mark endpoints public, authenticated-user, resource-owner or admin-only.
+   - Enforce auth and role checks on the API, not only in the UI. Production must fail closed when auth configuration is absent or invalid.
+   - Define CORS allowlists, cookie/session handling and safe error responses from environment variables.
 
-**Exit gate:** a customer can complete the booking workflow against
-a real test database.
+**Exit gate:** a clean checkout can install, start the database, migrate and seed dev databases, build all six application surfaces, and run CI against isolated test databases. Negative safety tests prove that test setup refuses a non-`_test` URL. No production claim is made until auth/config tests pass.
 
-## Phase 2 — NuxFarm vertical slice (Weeks 4–5)
+## Phase 1 — Complete the NuxWell booking vertical slice
 
-**Goal:** farm operations workflow.
+**Goal:** a customer can discover a facility and complete a safe booking lifecycle.
 
-Tasks:
-- Standardize the existing farm API, schema and validation
-  (Phase 0 items applied to NuxFarm).
-- CSV/JSON import endpoint: schema validation, dry-run preview,
-  per-row error reporting, commit on confirmation.
-- Role-based access control (platform admin vs farm admin).
-- Dashboard page: active crop cycles, upcoming tasks, overdue tasks.
-- Task generation from templates; Jest tests with safety contract;
-  project README.
+### Work items
 
-**Exit gate:** the farm admin can manage an active crop cycle
-without manually editing the database.
+- Add availability lookup, booking create, customer history and cancellation APIs.
+- Validate facility/service status, duration, time ranges, ownership and cancellable states.
+- Enforce capacity/overlap in a transaction with an appropriate concurrency strategy. A UI-only availability check is insufficient.
+- Connect Neon Auth session identity to the local `User` using `authSubjectId`; enforce API guards for customer and admin operations.
+- Build facility/service details → availability → booking → dashboard/history → cancellation; include loading, empty, validation and error states.
+- Add seed fixtures and API/E2E tests, including parallel requests, duplicate/overlapping booking, invalid service, unauthorized access and cancellation ownership.
 
-## Phase 3 — NuxCafe vertical slice (Weeks 6–7)
+**Exit gate:** Playwright completes a booking against `nuxwell_test`; API tests demonstrate no capacity oversell under concurrency and all protected endpoints enforce ownership/roles.
 
-**Goal:** kitchen operations workflow.
+## Phase 2 — Complete the NuxFarm operations vertical slice
 
-Tasks:
-- Role-based kitchen/admin access enforcement on the API.
-- Low-stock warning verification and dashboard surfacing.
-- Cancellation and failure-path tests (insufficient stock, concurrent
-  completion attempts).
-- Finish documentation and deployment configuration.
+**Goal:** a farm administrator can manage an active crop cycle through the UI without editing database rows manually.
 
-**Exit gate:** an order can be processed and ingredient usage
-reconciles correctly.
+### Work items
 
-## Phase 4 — Integration and release (Week 8)
+- Complete farm/location and crop-cycle creation/editing; keep existing domain modules unless a concrete defect requires change.
+- Finish task lifecycle: plan/assign/start/complete/block/skip and make upcoming/overdue tasks visible on an operational overview.
+- Add CSV/JSON import with schema validation, dry-run preview, row-level error reporting and explicit commit. A file with validation errors must not partially commit.
+- Add platform-admin/farm-admin/member authorization and resource-scope checks.
+- Add Jest/API integration tests and a test-DB safety contract; add import fixtures and document setup.
+- Support historical imports and future task projections only through explicit schemas; surface invalid dates, duplicate external IDs and timezone assumptions.
 
-**Goal:** all three applications pass acceptance and deploy
-independently.
+**Agronomy safeguard:** do not introduce generated EC, pH, nutrient concentrations or fertilizer schedules as authoritative values. Keep recommendations deferred until a qualified agronomist supplies reviewed values, units, crop stages, source and effective dates.
 
-Tasks:
-- Test all six web/API ports, seed/test isolation, authentication,
-  deployment configuration, database migrations, error handling and
-  recovery instructions.
-- Smoke and acceptance test pass across all three applications.
-- Deployment runbooks finalized; rollback path verified.
+**Exit gate:** farm admin manages a cycle, records irrigation and completes tasks; overview shows active/upcoming/overdue work; valid imports commit and invalid imports commit nothing; a member cannot perform admin operations.
 
-**Exit gate:** all three apps pass the agreed smoke and acceptance
-tests, and each can be deployed independently.
+## Phase 3 — Harden and complete the NuxCafe kitchen vertical slice
 
-## Epic mapping
+**Goal:** the order-to-production-to-stock workflow remains consistent under failure and concurrent activity.
 
-| Epic | Phase |
-|---|---|
-| INF-1 Infrastructure hardening | 0 |
-| INF-2 Environment and database safety | 0 |
-| INF-3 CI build and test pipeline | 0 |
-| NW-1 Facilities and services | 1 |
-| NW-2 Availability and booking integrity | 1 |
-| NW-3 Customer dashboard and admin | 1 |
-| NF-1 Farm locations and crop cycles | 2 |
-| NF-2 Tasks and irrigation logs | 2 |
-| NC-1 Ingredients, recipes and menu | 3 (done) |
-| NC-2 Orders, production and stock | 3 (done; guards + tests remain) |
-| REL-1 Security, smoke tests and release | 4 |
+### Work items
+
+- Enforce authentication and kitchen/admin role permissions on API endpoints.
+- Confirm order totals are calculated server-side from current prices.
+- Preserve transactional order completion and auditable stock movements.
+- Test insufficient stock, cancellation before completion, transaction rollback, duplicate completion and two orders competing for the same ingredient stock.
+- Confirm low-stock indicators and daily order/sales totals against source records.
+- Document stock adjustment semantics and ensure adjustments always create traceable movements.
+
+**Exit gate:** order completion updates order, production, sale and stock exactly once; failure or cancellation leaves stock correct; concurrent completion cannot create duplicate consumption.
+
+## Phase 4 — Release readiness and independent deployment
+
+**Goal:** all three apps can be deployed and rolled back independently.
+
+### Work items
+
+- Run the full acceptance suite from a clean environment and record commit SHA, commands, outcomes and artifacts.
+- Verify Render web/API build commands, health checks, environment variables and CORS for all three pairs.
+- Configure separate Neon database credentials per application/environment; verify Neon Auth production configuration.
+- Run `prisma migrate deploy` as an explicit release step before switching the API to the new release. Never reset a production database.
+- Verify backups/snapshots and a rollback exercise with a schema-compatible previous application version.
+- Run smoke tests against deployed web and API URLs without exposing secrets or production customer data.
+- Complete operational documentation: first install, startup/shutdown, safe reset, migrations, seeds, test commands, backup/restore, incident notes and deployment rollback.
+
+**Exit gate:** CI is green, each app passes acceptance and deployed smoke tests, each app can release independently, and rollback instructions have been rehearsed.
+
+## Backlog mapping
+
+| Epic | Phase | Priority |
+|---|---:|---|
+| INF-1 Infrastructure hardening | 0 | P0 |
+| INF-2 Environment and database safety | 0 | P0 |
+| INF-3 CI build and test pipeline | 0 | P0 |
+| REL-1 Security, smoke tests and release | 0 and 4 | P0 |
+| NW-1 Facilities and services | 1 | P1 |
+| NW-2 Availability and booking integrity | 1 | P0 |
+| NW-3 Customer dashboard and admin | 1 | P1 |
+| NF-1 Farm locations and crop cycles | 2 | P1 |
+| NF-2 Tasks, irrigation and import | 2 | P1 |
+| NC-1 Ingredients, recipes and menu | Existing baseline; harden in 3 | P1 |
+| NC-2 Orders, production and stock | Existing baseline; harden in 3 | P0 |
+
+## Working rule
+
+Do not start the next feature because a calendar week elapsed. Start it when the previous phase's exit evidence is recorded. Keep commits small, preserve working modules and migration history, and never make a deployment or destructive reset part of a documentation-only change.
