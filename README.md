@@ -1,142 +1,99 @@
 # Nux Dev Infrastructure
 
-Reusable local development infrastructure for NuxWell, NuxFarm, NuxCafe and future projects.
+Reusable local development infrastructure and coordinated MVP workspace for NuxWell, NuxFarm and NuxCafe.
+
+## Current MVP programme
+
+The app implementations already contain working domain code; the next step is stabilization and completing missing end-to-end capabilities, not a wholesale rewrite.
+
+**Start here:** [MVP programme overview](docs/mvp/README.md)
+
+The plan includes a source-level repository audit, architecture and port contracts, per-app scopes, ordered milestones, acceptance criteria, and a Render/Neon release runbook.
 
 ## Architecture
 
-- Windows + Docker Desktop
-- WSL2 Ubuntu can run `docker compose` through Docker Desktop WSL integration
-- PostgreSQL 17 shared across projects
+- Windows + Docker Desktop; WSL2 Ubuntu uses Docker Desktop integration
+- PostgreSQL 17 shared local server; separate database per product and environment
 - pgAdmin for database administration
-- Mailpit for local email testing
+- Mailpit for local SMTP/email testing
 - No Redis
 
-## Project databases
+## Local databases
 
-- `nuxwell_dev`
-- `nuxwell_test`
-- `nuxfarm_dev`
-- `nuxfarm_test`
-- `nuxcafe_dev`
-- `nuxcafe_test`
+| App | Development | Automated tests |
+|---|---|---|
+| NuxWell | `nuxwell_dev` | `nuxwell_test` |
+| NuxFarm | `nuxfarm_dev` | `nuxfarm_test` |
+| NuxCafe | `nuxcafe_dev` | `nuxcafe_test` |
+
+Never point automated tests, test migrations or test cleanup at a development or production database. Test setup must refuse to proceed unless the selected database name ends with `_test`.
 
 ## Ports
 
-Ports are configurable in `.env` (defaults from
-`.env.example` shown; this machine's `.env` uses
-`POSTGRES_PORT=5433`):
+Defaults in `.env.example` are shown below. A developer can override `POSTGRES_PORT` in their ignored local `.env` (for example, 5433 if host port 5432 is occupied). The PostgreSQL port inside Docker networking remains 5432.
 
-| Service | `.env` variable | Default |
-|---|---|---:|
-| PostgreSQL | `POSTGRES_PORT` | 5432 |
-| pgAdmin | `PGADMIN_PORT` | 5050 |
-| Mailpit UI | `MAILPIT_UI_PORT` | 8025 |
-| Mailpit SMTP | `MAILPIT_SMTP_PORT` | 1025 |
+| Service | Host port default |
+|---|---:|
+| PostgreSQL | 5432 |
+| pgAdmin | 5050 |
+| Mailpit UI | 8025 |
+| Mailpit SMTP | 1025 |
 
-## Windows PowerShell
+| Application | Web | API |
+|---|---:|---:|
+| NuxWell | 3090 | 3091 |
+| NuxFarm | 3092 | 3093 |
+| NuxCafe | 3094 | 3095 |
+
+## Start local services
+
+### Windows PowerShell
 
 ```powershell
-cd C:\dev\infrastructure
 Copy-Item .env.example .env
+# Edit .env and replace all example passwords before starting.
+docker compose config
 docker compose up -d
 docker compose ps
 ```
 
-## WSL2 Ubuntu
+### WSL2 Ubuntu
 
-From the same Windows directory mounted into WSL:
+Run from the repository directory mounted into WSL. With Docker Desktop WSL integration enabled, do not install another Docker Engine inside Ubuntu unless needed for a deliberate separate runtime.
 
 ```bash
-cd /mnt/c/dev/infrastructure
 cp .env.example .env
+# Edit .env and replace all example passwords before starting.
+docker compose config
 docker compose up -d
 docker compose ps
 ```
 
-With Docker Desktop WSL integration enabled, do not install a second Docker Engine inside Ubuntu unless you have a specific reason.
+For details on per-project install, migration, seed and test commands, use each project README under `projects/`.
 
-## Application database URLs
+## Database connection rules
 
-Replace `YOUR_PASSWORD` with `POSTGRES_PASSWORD` and
-`PORT` with `POSTGRES_PORT` from your `.env` (5433 on
-this machine).
+From the host machine, use `localhost:<POSTGRES_PORT>` and a project database name. From pgAdmin (which runs inside the Compose network), use host `postgres`, port `5432`, database `postgres`, username `postgres` and the password from `.env`.
 
-### NuxWell
+Example host URL (substitute local values; never commit the actual URL):
 
-```
-postgresql://postgres:YOUR_PASSWORD@localhost:PORT/nuxwell_dev
+```text
+postgresql://postgres:<PASSWORD>@localhost:<POSTGRES_PORT>/nuxwell_dev
 ```
 
-### NuxFarm
+Change the database name to the corresponding `*_test` value for automated tests.
 
-```
-postgresql://postgres:YOUR_PASSWORD@localhost:PORT/nuxfarm_dev
-```
+## Destructive reset warning
 
-NuxFarm runs as two local apps:
+`docker compose down -v` removes the shared PostgreSQL data volume and **deletes every local project database**. Use only when a complete local data reset is intended. Prefer the confirmation-protected reset script after reviewing its target and the current backup/export state. A reset is not part of normal setup or documentation updates.
 
-| App | Port | Start |
-|---|---:|---|
-| Web (Next.js) | 3092 | `npm --prefix projects/nuxfarm/apps/web run dev` |
-| API (NestJS) | 3093 | `npm --prefix projects/nuxfarm/apps/api run start:dev` |
+## Deployment
 
-From the project root, `npm run dev` starts both with `concurrently`.
+Production hosting is designed separately from local development:
 
-### NuxCafe
+- GitHub for source control and CI
+- Render for three independent web services and three APIs
+- Neon PostgreSQL with separate per-app production databases/credentials
+- Neon Auth required in production
 
-```
-postgresql://postgres:YOUR_PASSWORD@localhost:PORT/nuxcafe_dev
-```
-
-NuxCafe runs as two local apps:
-
-| App | Port | Start |
-|---|---:|---|
-| Web (Next.js) | 3094 | `npm --prefix projects/nuxcafe/apps/web run dev` |
-| API (NestJS) | 3095 | `npm --prefix projects/nuxcafe/apps/api run start:dev` |
-
-From the project root, `npm run dev` starts both with `concurrently`.
-
-For automated tests, use the matching `*_test` database.
-
-## Mailpit
-
-SMTP:
-
-```
-SMTP_HOST=localhost
-SMTP_PORT=1025
-```
-
-Web UI:
-
-http://localhost:8025
-
-## pgAdmin
-
-Open http://localhost:5050.
-
-When adding the PostgreSQL server from inside pgAdmin, use:
-
-- Host: `postgres`
-- Port: `5432`
-- Database: `postgres`
-- Username: `postgres`
-- Password: value from `.env`
-
-## Important database reset warning
-
-`docker compose down -v` deletes the shared PostgreSQL data volume and therefore all local project databases.
-
-Use it only when a full local database reset is intended.
-
-## Production
-
-Production application hosting is outside this repository:
-
-- GitHub: source control and CI
-- Render: Next.js / NestJS application hosting
-- Neon PostgreSQL: production database
-- Neon Auth: authentication
-
-This repository is intentionally focused on reusable Windows/WSL local infrastructure.
+Production uses platform-injected environment variables, not local `.env` files. Run Prisma migrations as an explicit release step; do not auto-migrate in API startup. See [deployment and rollback](docs/mvp/deployment.md).
