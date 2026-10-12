@@ -68,7 +68,7 @@ This is a source review of the repository branch, not a claim that the code was 
 
 ## Environment and infrastructure inconsistencies
 
-1. `scripts/status.ps1` was reported in the prior audit to hard-code port 5432 while the developer's local `.env` uses 5433. Read the configured host port from `.env` and retain 5432 only for container-to-container access (for example, pgAdmin to service `postgres`).
+1. ~~`scripts/status.ps1` was reported in the prior audit to hard-code port 5432 while the developer's local `.env` uses 5433.~~ **Resolved in `e424fa49`:** `scripts/status.ps1` now reads the configured host ports (`POSTGRES_PORT`, `PGADMIN_PORT`, `MAILPIT_UI_PORT`) from the ignored local `.env`; port 5432 remains container-internal only (for example, pgAdmin to service `postgres`).
 2. `projects/nuxfarm/apps/api/src/main.ts` does not set the `/api` global prefix, unlike the NuxWell and NuxCafe bootstraps. Align the routes and all consumers.
 3. NuxFarm has two init migrations in its current history (the earlier migration reportedly created a stray `HealthCheck` table and the next removed it). Do not simply delete an applied migration. Validate both clean installs and already-migrated development databases.
 4. Validation approaches differ across apps (Nest class-validator pipes in some services and Zod in NuxFarm). Treat this as a documented consistency difference, not a reason to rewrite working modules in bulk.

@@ -47,7 +47,7 @@
 - [ ] Confirm the persistent volume is named and its data-loss implications are documented.
 - [ ] Confirm first-volume initialization creates exactly the six databases: `nuxwell_dev`, `nuxwell_test`, `nuxfarm_dev`, `nuxfarm_test`, `nuxcafe_dev`, `nuxcafe_test`.
 - [ ] Document the distinction between PostgreSQL host port and container port: host defaults to 5432, container stays 5432; developer override such as 5433 must be reflected in host URLs.
-- [ ] Fix `scripts/status.ps1` to read the host port from ignored local `.env` instead of hard-coding 5432.
+- [x] Fix `scripts/status.ps1` to read the host port from ignored local `.env` instead of hard-coding 5432. **Done in `e424fa49`** — the script reads `POSTGRES_PORT`, `PGADMIN_PORT` and `MAILPIT_UI_PORT` from `.env`.
 - [ ] Confirm pgAdmin uses Docker network hostname `postgres:5432`; host applications use `localhost:<POSTGRES_PORT>`.
 - [ ] Verify Mailpit UI/SMTP ports and include a test email workflow.
 - [ ] Verify `scripts/up.ps1`, `down.ps1`, `status.ps1` behave consistently from Windows PowerShell.

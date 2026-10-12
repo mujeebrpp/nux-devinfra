@@ -9,7 +9,7 @@ This is a dependency-ordered delivery plan for one primary developer using codin
 ### Work items
 
 1. **Infrastructure and environment contract**
-   - Fix `scripts/status.ps1` so the host-side PostgreSQL port comes from `.env`; container-internal connections continue to use port 5432.
+   - Fix `scripts/status.ps1` so the host-side PostgreSQL port comes from `.env`; container-internal connections continue to use port 5432. **Done in `e424fa49`.**
    - Check required variables at startup and document which files each app uses in development, test and production. Do not load local environment files in production.
    - Validate the Docker Compose file and confirm the six expected databases are created on a fresh volume.
    - Keep destructive reset explicit and confirmation-protected. Add migrate/seed orchestration without making ordinary startup destructive.
