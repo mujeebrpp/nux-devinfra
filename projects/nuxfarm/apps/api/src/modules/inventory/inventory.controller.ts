@@ -17,7 +17,7 @@ import {
 } from "./inventory.schemas";
 import { InventoryService } from "./inventory.service";
 
-@Controller("farms/:farmId/inventory")
+@Controller("/api/farms/:farmId/inventory")
 export class InventoryController {
   constructor(private readonly inventory: InventoryService) {}
 

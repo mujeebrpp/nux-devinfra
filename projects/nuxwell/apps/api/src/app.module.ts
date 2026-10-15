@@ -4,6 +4,7 @@ import { resolveEnvFiles } from "./config/env";
 import { FacilitiesModule } from "./facilities/facilities.module";
 import { HealthModule } from "./health/health.module";
 import { PrismaModule } from "./prisma/prisma.module";
+import { BookingModule } from "./bookings/booking.module";
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { PrismaModule } from "./prisma/prisma.module";
     PrismaModule,
     HealthModule,
     FacilitiesModule,
+    BookingModule,
   ],
 })
 export class AppModule {}

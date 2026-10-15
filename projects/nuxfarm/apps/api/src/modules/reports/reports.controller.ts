@@ -15,7 +15,7 @@ import {
 } from "./reports.schemas";
 import { ReportsService } from "./reports.service";
 
-@Controller("farms/:farmId/reports")
+@Controller("/api/farms/:farmId/reports")
 export class ReportsController {
   constructor(private readonly reports: ReportsService) {}
 

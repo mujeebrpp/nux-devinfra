@@ -17,7 +17,7 @@ import {
 } from "./irrigation.schemas";
 import { IrrigationService } from "./irrigation.service";
 
-@Controller("farms/:farmId/irrigation")
+@Controller("/api/farms/:farmId/irrigation")
 export class IrrigationController {
   constructor(private readonly irrigation: IrrigationService) {}
 

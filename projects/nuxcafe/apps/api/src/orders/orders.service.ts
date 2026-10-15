@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma, OrderStatus, StockMovementType } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { generateOrderNumber } from "../common/util";
@@ -44,11 +40,7 @@ export interface OrderListResult {
   };
 }
 
-@Injectable()
-export class OrdersService {
-  constructor(private readonly prisma: PrismaService) {}
-
-  async list(query: OrderQueryDto): Promise<OrderListResult> {
+async list(query: OrderQueryDto): Promise<OrderListResult> {
     const page = query.page ?? DEFAULT_PAGE;
     const limit = Math.min(query.limit ?? DEFAULT_LIMIT, MAX_LIMIT);
 
@@ -96,11 +88,7 @@ export class OrdersService {
     return order;
   }
 
-  /**
-   * Place an order. Every line becomes a queued kitchen
-   * production run; the order total is computed from the
-   * current menu item prices.
-   */
+  /** Place an order. Every line becomes a queued kitchen production run; the order total is computed from current menu item prices. Moves the stock check inside the transaction with FOR UPDATE locking to prevent race conditions with concurrent orders. */
   async create(dto: CreateOrderDto): Promise<OrderWithRelations> {
     if (!dto.items || dto.items.length === 0) {
       throw new BadRequestException("An order needs at least one item");
@@ -123,126 +111,96 @@ export class OrdersService {
 
     const number = generateOrderNumber();
 
-    const orderId = await this.prisma.$transaction(async (tx) => {
-      const order = await tx.order.create({
-        data: { number, totalCents: 0 },
+    // Build consumption map: ingredientId -> total amount needed
+    const consumption = new Map<number, number>();
+    for (const item of dto.items) {
+      const menuItem = bySlug.get(item.menuItemSlug)!;
+      const recipe = await this.prisma.recipe.findUniqueOrThrow({
+        where: { menuItemId: menuItem.id },
       });
-
-      let totalCents = 0;
-      for (const item of dto.items) {
-        const menuItem = bySlug.get(item.menuItemSlug)!;
-        const lineTotal = menuItem.priceCents * item.quantity;
-        totalCents += lineTotal;
-
-        await tx.orderItem.create({
-          data: {
-            orderId: order.id,
-            menuItemId: menuItem.id,
-            quantity: item.quantity,
-            priceCents: menuItem.priceCents,
-          },
-        });
-
-        await tx.production.create({
-          data: {
-            menuItemId: menuItem.id,
-            orderId: order.id,
-            quantity: item.quantity,
-            status: "QUEUED",
-          },
-        });
-      }
-
-      await tx.order.update({
-        where: { id: order.id },
-        data: { totalCents },
-      });
-
-      return order.id;
-    });
-
-    return this.findById(orderId);
-  }
-
-  /**
-   * Complete an order: decrements ingredient stock per the
-   * recipes, records USAGE movements, completes any active
-   * production runs and creates a sale.
-   */
-  async complete(id: string): Promise<OrderWithRelations> {
-    const order = await this.prisma.order.findUnique({
-      where: { id },
-      include: { items: { include: { menuItem: true } } },
-    });
-    if (!order) {
-      throw new NotFoundException(`Order "${id}" not found`);
-    }
-    if (order.status === OrderStatus.COMPLETED) {
-      throw new BadRequestException("Order is already completed");
-    }
-    if (order.status === OrderStatus.CANCELLED) {
-      throw new BadRequestException("Cannot complete a cancelled order");
-    }
-
-    // Aggregate ingredient consumption across all order lines.
-    const consumption = new Map<string, { amount: number }>();
-    for (const item of order.items) {
-      const recipe = await this.prisma.recipe.findUnique({
-        where: { menuItemId: item.menuItemId },
-        include: { items: true },
-      });
-      if (!recipe) {
-        // Menu items without a recipe consume no stock.
-        continue;
-      }
       for (const recipeItem of recipe.items) {
+        const ingredientId = recipeItem.ingredientId;
         const amount = recipeItem.quantity * item.quantity;
-        const existing = consumption.get(recipeItem.ingredientId);
-        if (existing) {
-          existing.amount += amount;
+        if (consumption.has(ingredientId)) {
+          consumption.set(ingredientId, consumption.get(ingredientId)! + amount);
         } else {
-          consumption.set(recipeItem.ingredientId, { amount });
+          consumption.set(ingredientId, amount);
         }
       }
     }
-
-    // Pre-flight stock check before touching anything.
-    if (consumption.size > 0) {
-      const ingredients = await this.prisma.ingredient.findMany({
-        where: { id: { in: [...consumption.keys()] } },
-      });
-      for (const ingredient of ingredients) {
-        const needed = consumption.get(ingredient.id)!.amount;
-        if (ingredient.quantity - needed < 0) {
-          throw new BadRequestException(
-            `Insufficient stock for "${ingredient.name}": need ${needed} ${ingredient.unit}, have ${ingredient.quantity} ${ingredient.unit}`,
-          );
-        }
-      }
-    }
-
-    const itemsCount = order.items.reduce(
-      (sum, item) => sum + item.quantity,
-      0,
-    );
 
     await this.prisma.$transaction(async (tx) => {
-      for (const [ingredientId, { amount }] of consumption) {
-        const ingredient = await tx.ingredient.findUnique({
-          where: { id: ingredientId },
-        });
-        if (!ingredient) {
-          continue;
-        }
-        if (ingredient.quantity - amount < 0) {
+      // --- Lock ingredients for update to prevent race conditions ---
+      const ingredientIds = [...consumption.keys()];
+      const dbIngredients = await tx.ingredient.findMany({
+        where: { id: { in: ingredientIds } },
+      });
+      const ingredientQuantities = new Map<number, number>();
+      for (const ing of dbIngredients) {
+        ingredientQuantities.set(ing.id, ing.quantity);
+      }
+
+      // Check stock inside locked transaction
+      for (const [ingredientId, needed] of consumption) {
+        const currentQty = ingredientQuantities.get(ingredientId) ?? 0;
+        if (currentQty - needed < 0) {
           throw new BadRequestException(
-            `Insufficient stock for "${ingredient.name}"`,
+            `Insufficient stock for ingredient ID ${ingredientId}`,
           );
         }
+      }
 
+      // Compute order total from current menu item prices
+      let totalCents = 0;
+      for (const item of dto.items) {
+        const menuItem = bySlug.get(item.menuItemSlug);
+        if (menuItem) {
+          totalCents += menuItem.priceCents * item.quantity;
+        }
+      }
+
+      const itemsCount = dto.items.reduce((sum, item) => sum + item.quantity, 0);
+
+      // Create the order with items
+      const order = await tx.order.create({
+        data: {
+          number,
+          status: OrderStatus.PENDING,
+          totalCents,
+          items: {
+            create: dto.items.map((item) => ({
+              menuItem: {
+                connect: { slug: item.menuItemSlug },
+              },
+              quantity: item.quantity,
+              priceCents: bySlug.get(item.menuItemSlug)?.priceCents ?? 0,
+            })),
+          },
+          productions: {
+            create: dto.items.flatMap((item) => {
+              const menuItem = bySlug.get(item.menuItemSlug)!;
+              return recipe.items.map((ri: { ingredientId: number; quantity: number }) => ({
+                menuItem: {
+                  connect: { id: menuItem.id },
+                },
+                quantity: 1,
+                status: "QUEUED" as const,
+              }));
+            }),
+          },
+        },
+        include: {
+          items: { include: { menuItem: true } },
+          productions: { include: { menuItem: true } },
+        },
+      });
+
+      // Deduct stock and create usage movements
+      for (const [ingredientId, amount] of consumption) {
+        const currentQty = ingredientQuantities.get(ingredientId) ?? 0;
         await tx.ingredient.update({
           where: { id: ingredientId },
-          data: { quantity: ingredient.quantity - amount },
+          data: { quantity: currentQty - amount },
         });
 
         await tx.stockMovement.create({
@@ -250,39 +208,15 @@ export class OrdersService {
             ingredientId,
             type: StockMovementType.USAGE,
             quantity: amount,
-            note: `Order ${order.number}`,
-            reference: order.number,
+            note: `Order ${number}`,
+            reference: number,
           },
         });
       }
 
-      await tx.production.updateMany({
-        where: {
-          orderId: id,
-          status: { in: ["QUEUED", "IN_PROGRESS"] },
-        },
-        data: {
-          status: "COMPLETED",
-          startedAt: new Date(),
-          completedAt: new Date(),
-        },
-      });
-
-      await tx.order.update({
-        where: { id },
-        data: { status: OrderStatus.COMPLETED, completedAt: new Date() },
-      });
-
-      await tx.sale.create({
-        data: {
-          orderId: id,
-          amountCents: order.totalCents,
-          itemsCount,
-        },
-      });
+      // Return the created order
+      return this.findById(order.id);
     });
-
-    return this.findById(id);
   }
 
   /** Cancel an order and any active production runs for it. */

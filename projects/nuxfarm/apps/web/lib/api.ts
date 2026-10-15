@@ -12,7 +12,7 @@ import type {
 } from "./types";
 
 const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3093";
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3093/api";
 
 async function apiGet<T>(path: string): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, { cache: "no-store" });

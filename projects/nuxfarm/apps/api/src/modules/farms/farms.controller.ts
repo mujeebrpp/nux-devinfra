@@ -18,7 +18,7 @@ import {
 } from "./farms.schemas";
 import { FarmsService } from "./farms.service";
 
-@Controller("farms")
+@Controller("/api/farms")
 export class FarmsController {
   constructor(private readonly farms: FarmsService) {}
 

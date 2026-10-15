@@ -196,4 +196,44 @@ describe("Orders (e2e)", () => {
     expect(cancelResponse.body.status).toBe("CANCELLED");
     expect(cancelResponse.body.productions[0].status).toBe("CANCELLED");
   });
+
+  it("concurrent orders completing for same ingredient should not double-consume stock", async () => {
+    // Create first order but don't complete it yet
+    const order1Response = await request(app.getHttpServer())
+      .post("/api/orders")
+      .send({ items: [{ menuItemSlug, quantity: 1 }] })
+      .expect(201);
+
+    // Create second order concurrently
+    const order2Response = await request(app.getHttpServer())
+      .post("/api/orders")
+      .send({ items: [{ menuItemSlug, quantity: 1 }] })
+      .expect(201);
+
+    const order1Id = order1Response.body.id;
+    const order2Id = order2Response.body.id;
+
+    // Complete both orders concurrently
+    const [result1, result2] = await Promise.all([
+      request(app.getHttpServer()).post(`/api/orders/${order1Id}/complete`),
+      request(app.getHttpServer()).post(`/api/orders/${order2Id}/complete`),
+    ]);
+
+    // Stock should not be overallocated - total consumed across both orders
+    // must not exceed the original ingredient quantity
+    const ingredient = await prisma.ingredient.findUnique({
+      where: { slug: ingredientSlug },
+    });
+    const usageMovements = await prisma.stockMovement.findMany({
+      where: { ingredient: { slug: ingredientSlug }, type: "USAGE" },
+    });
+    const totalConsumed = usageMovements.reduce((sum, mov) => sum + mov.quantity, 0);
+    expect(totalConsumed).toBeLessThanOrEqual(1000); // ingredient was seeded with 1000
+
+    // At least one order should complete successfully
+    const completedCount = [result1.status, result2.status].filter(
+      (s) => s === "COMPLETED"
+    ).length;
+    expect(completedCount).toBeGreaterThanOrEqual(1);
+  });
 });

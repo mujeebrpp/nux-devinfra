@@ -18,7 +18,7 @@ import {
 } from "./cycles.schemas";
 import { CyclesService } from "./cycles.service";
 
-@Controller("farms/:farmId/cycles")
+@Controller("/api/farms/:farmId/cycles")
 export class CyclesController {
   constructor(private readonly cycles: CyclesService) {}
 

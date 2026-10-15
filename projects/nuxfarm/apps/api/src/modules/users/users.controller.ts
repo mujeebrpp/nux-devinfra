@@ -12,7 +12,7 @@ import { uuidSchema } from "../../common/schemas/common.schemas";
 import { createUserSchema, updateUserSchema } from "./users.schemas";
 import { UsersService } from "./users.service";
 
-@Controller("users")
+@Controller("/api/users")
 export class UsersController {
   constructor(private readonly users: UsersService) {}
 

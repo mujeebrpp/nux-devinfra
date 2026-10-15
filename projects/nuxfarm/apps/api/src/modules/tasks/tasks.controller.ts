@@ -13,7 +13,7 @@ import { uuidSchema } from "../../common/schemas/common.schemas";
 import { createTaskSchema, updateTaskSchema } from "./tasks.schemas";
 import { TasksService } from "./tasks.service";
 
-@Controller("farms/:farmId/tasks")
+@Controller("/api/farms/:farmId/tasks")
 export class TasksController {
   constructor(private readonly tasks: TasksService) {}
 
