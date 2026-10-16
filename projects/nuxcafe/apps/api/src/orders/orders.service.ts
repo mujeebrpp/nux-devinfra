@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma, OrderStatus, StockMovementType } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { generateOrderNumber } from "../common/util";
@@ -40,7 +40,11 @@ export interface OrderListResult {
   };
 }
 
-async list(query: OrderQueryDto): Promise<OrderListResult> {
+@Injectable()
+export class OrdersService {
+  constructor(private prisma: PrismaService) {}
+
+  async list(query: OrderQueryDto): Promise<OrderListResult> {
     const page = query.page ?? DEFAULT_PAGE;
     const limit = Math.min(query.limit ?? DEFAULT_LIMIT, MAX_LIMIT);
 
@@ -112,12 +116,15 @@ async list(query: OrderQueryDto): Promise<OrderListResult> {
     const number = generateOrderNumber();
 
     // Build consumption map: ingredientId -> total amount needed
-    const consumption = new Map<number, number>();
+    const consumption = new Map<string, number>();
+    const recipesByMenuItemId = new Map<string, any[]>();
     for (const item of dto.items) {
       const menuItem = bySlug.get(item.menuItemSlug)!;
       const recipe = await this.prisma.recipe.findUniqueOrThrow({
         where: { menuItemId: menuItem.id },
+        include: { items: true },
       });
+      recipesByMenuItemId.set(menuItem.id, recipe.items);
       for (const recipeItem of recipe.items) {
         const ingredientId = recipeItem.ingredientId;
         const amount = recipeItem.quantity * item.quantity;
@@ -129,13 +136,13 @@ async list(query: OrderQueryDto): Promise<OrderListResult> {
       }
     }
 
-    await this.prisma.$transaction(async (tx) => {
+    return this.prisma.$transaction(async (tx) => {
       // --- Lock ingredients for update to prevent race conditions ---
       const ingredientIds = [...consumption.keys()];
       const dbIngredients = await tx.ingredient.findMany({
         where: { id: { in: ingredientIds } },
       });
-      const ingredientQuantities = new Map<number, number>();
+      const ingredientQuantities = new Map<string, number>();
       for (const ing of dbIngredients) {
         ingredientQuantities.set(ing.id, ing.quantity);
       }
@@ -179,7 +186,8 @@ async list(query: OrderQueryDto): Promise<OrderListResult> {
           productions: {
             create: dto.items.flatMap((item) => {
               const menuItem = bySlug.get(item.menuItemSlug)!;
-              return recipe.items.map((ri: { ingredientId: number; quantity: number }) => ({
+              const recipeItems = recipesByMenuItemId.get(menuItem.id)!;
+              return recipeItems.map((ri: { ingredientId: string; quantity: number }) => ({
                 menuItem: {
                   connect: { id: menuItem.id },
                 },
@@ -249,5 +257,51 @@ async list(query: OrderQueryDto): Promise<OrderListResult> {
     ]);
 
     return this.findById(id);
+  }
+
+  /** Complete an order: consumes stock and records the sale. */
+  async complete(id: string): Promise<OrderWithRelations> {
+    const order = await this.prisma.order.findUnique({
+      where: { id },
+      include: { items: { include: { menuItem: true } } },
+    });
+    if (!order) {
+      throw new NotFoundException(`Order "${id}" not found`);
+    }
+    if (order.status !== OrderStatus.PENDING) {
+      throw new BadRequestException(
+        `Only pending orders can be completed (current status: ${order.status})`,
+      );
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const completedOrder = await tx.order.update({
+        where: { id },
+        data: { status: OrderStatus.COMPLETED },
+        include: {
+          items: { include: { menuItem: true } },
+          productions: { include: { menuItem: true } },
+          sale: true,
+        },
+      });
+
+      // Create sale record from order items
+      let amountCents = 0;
+      let itemsCount = 0;
+      for (const item of order.items) {
+        amountCents += item.priceCents * item.quantity;
+        itemsCount += item.quantity;
+      }
+
+      await tx.sale.create({
+        data: {
+          orderId: id,
+          amountCents,
+          itemsCount,
+        },
+      });
+
+      return completedOrder;
+    });
   }
 }

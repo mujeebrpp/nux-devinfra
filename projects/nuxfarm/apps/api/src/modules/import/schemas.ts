@@ -71,8 +71,6 @@ export const jsonImportSchema = z.object({
     variety: z.string().optional(),
     plantingMethod: z.string().optional(),
     irrigatedAt: z.date().optional(),
-    method: z.enum(["DRIP", "SPRINKLER", "FLOOD", "MANUAL", "OTHER"]).optional(),
-    volumeLiters: z.number().optional(),
     transactions: z.array(z.object({
       type: z.enum(["IN", "OUT", "ADJUST"]),
       quantity: z.number(),

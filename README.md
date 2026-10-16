@@ -93,7 +93,10 @@ Production hosting is designed separately from local development:
 
 - GitHub for source control and CI
 - Render for three independent web services and three APIs
-- Neon PostgreSQL with separate per-app production databases/credentials
-- Neon Auth required in production
+- **nuxcafe-production** Neon project (`crimson-smoke-06987111`) → 7 tables: ingredients, menu_items, orders, productions, recipes, sales, stock_movements
+- **nuxfarm-production** Neon project (`blue-dew-07210136`) → 9 tables: farms, farm_locations, crop_cycles, cycle_stages, tasks, irrigation_logs, inventory_items, inventory_transactions, reports
+- **nuxwell-production** Neon project (`still-mountain-91557539`) → 5 tables: users (with Neon Auth), facilities, services, membership_plans, bookings
+
+Each project has its own Neon PostgreSQL 18 database with dedicated credentials. All databases are in `aws-us-east-2` region (nuxcafe, nuxwell) or `aws-us-west-2` (nuxfarm).
 
 Production uses platform-injected environment variables, not local `.env` files. Run Prisma migrations as an explicit release step; do not auto-migrate in API startup. See [deployment and rollback](docs/mvp/deployment.md).

@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, ConflictException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
+import { CreateBookingDto } from "./create-booking.dto";
 
 @Injectable()
 export class BookingService {
@@ -84,5 +85,37 @@ export class BookingService {
     });
 
     return booking;
+  }
+
+  async findAll(query: { userId?: string }) {
+    return this.prisma.booking.findMany({
+      where: query.userId ? { userId: query.userId } : {},
+    });
+  }
+
+  async findById(id: string) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id },
+    });
+    if (!booking) {
+      throw new NotFoundException(`Booking "${id}" not found`);
+    }
+    return booking;
+  }
+
+  async cancel(id: string, userId: string) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id },
+    });
+    if (!booking) {
+      throw new NotFoundException(`Booking "${id}" not found`);
+    }
+    if (booking.userId !== userId) {
+      throw new ConflictException("Not authorized to cancel this booking");
+    }
+    return this.prisma.booking.update({
+      where: { id },
+      data: { status: "CANCELLED" },
+    });
   }
 }

@@ -1,15 +1,7 @@
 import { PrismaClient } from "@prisma/client";
-const prisma = new PrismaClient();
-export const prisma: PrismaClient;
 import { csvImportRowSchema, jsonImportSchema, importValidationResultSchema, importOperationSchema } from "./schemas";
-import { PrismaClient } from "@prisma/client";
-const prisma = new PrismaClient();
-export const prisma: PrismaClient;
-import { csvImportRowSchema, jsonImportSchema, importValidationResultSchema, importOperationSchema } from "./schemas";
-import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
-import { PrismaClient } from "@prisma/client";
 
 /**
  * Executes an import operation after validation.
@@ -17,14 +9,14 @@ import { PrismaClient } from "@prisma/client";
  * @param operation - The type of import operation
  * @returns Result summary of the import operation
  */
-function executeImport(data: unknown, operation: string): {
+async function executeImport(data: unknown, operation: string): Promise<{
   success: boolean;
   totalRows: number;
   validRows: number;
   errorRows: number;
   created: number;
   errors: unknown[];
-} {
+}> {
   const validation = validateImportData(data, operation);
 
   if (!validation.valid) {
@@ -44,7 +36,7 @@ function executeImport(data: unknown, operation: string): {
 
   // Process each row with idempotent logic
   for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
+    const row = (rows[i] as any);
     let createInput: any;
 
     switch (operation) {
@@ -141,20 +133,20 @@ function executeImport(data: unknown, operation: string): {
         break;
       case "REPORTS":
         createInput = {
-          farmId: row.farmId,
-          type: row.type,
-          title: row.title,
-          periodStart: row.periodStart,
-          periodEnd: row.periodEnd,
-          filtersJson: row.filtersJson,
-          dataJson: row.dataJson,
+          farmId: (row as any).farmId,
+          type: (row as any).type,
+          title: (row as any).title,
+          periodStart: (row as any).periodStart,
+          periodEnd: (row as any).periodEnd,
+          filtersJson: (row as any).filtersJson,
+          dataJson: (row as any).dataJson,
         };
         break;
       default:
         throw new Error(`Unknown operation: ${operation}`);
     }
 
-    await prisma[operation.toLowerCase() + "s"].create({ data: createInput });
+    await (prisma as any)[operation.toLowerCase() + "s"].create({ data: createInput });
     created++;
   }
 
@@ -181,7 +173,7 @@ function validateImportData(data: unknown, operation: string): {
   errorRows: number;
   errors: unknown[];
 } {
-  let parsed: unknown;
+  let parsed: ReturnType<typeof jsonImportSchema.safeParse>;
   let errorRows: number = 0;
 
   try {

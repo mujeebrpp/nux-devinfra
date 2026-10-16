@@ -3,21 +3,21 @@ import { IsBoolean, IsDateString, IsInt, IsOptional, IsString, Min } from "class
 export class CreateBookingDto {
   /** ISO date string for the start of the booking window */
   @IsDateString()
-  startsAt: string;
+  startsAt!: string;
 
   /** ISO date string for the end of the booking window */
   @IsDateString()
-  endsAt: string;
+  endsAt!: string;
 
   /** UUID of the facility */
   @IsString()
-  facilityId: string;
+  facilityId!: string;
 
   /** UUID of the service */
   @IsString()
-  serviceId: string;
+  serviceId!: string;
 
   /** UUID of the user */
   @IsString()
-  userId: string;
+  userId!: string;
 }
